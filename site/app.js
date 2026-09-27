@@ -106,7 +106,7 @@ function dayRecord() {
 class HandwritingPad extends HTMLElement {
   connectedCallback() {
     this.padId = this.getAttribute("pad-id") || `pad-${Date.now()}`;
-    this.innerHTML = `<article class="panel pad-panel"><div class="pad-head"><div><strong>${this.getAttribute("title") || "手写板"}</strong><small>${this.getAttribute("hint") || ""}</small></div><div class="pad-tools"><button data-action="undo">撤销</button><button data-action="clear">清空</button><button data-action="save">导出图片</button></div></div><div class="canvas-wrap"><canvas aria-label="手写区"></canvas></div></article>`;
+    this.innerHTML = `<article class="panel pad-panel"><div class="pad-head"><div><strong>${this.getAttribute("title") || "手写板"}</strong><small>${this.getAttribute("hint") || ""}</small></div><div class="pad-tools"><button data-action="undo">撤销</button><button data-action="clear">清空</button><button data-action="save">导出图片</button><button class="ai-review-button" data-action="review">AI识别批改</button></div></div><div class="canvas-wrap"><canvas aria-label="手写区"></canvas></div><section class="ai-review hidden" aria-live="polite"><div class="ai-review-heading"><strong>AI批改结果</strong><button class="text-button" data-action="close-review">收起</button></div><div class="ai-review-body"></div></section></article>`;
     this.canvas = this.querySelector("canvas");
     this.ctx = this.canvas.getContext("2d");
     this.strokes = JSON.parse(localStorage.getItem(`${APP_KEY}:${this.padId}`) || "[]");
@@ -120,6 +120,8 @@ class HandwritingPad extends HTMLElement {
     this.querySelector('[data-action="undo"]').onclick = () => { this.strokes.pop(); this.persist(); this.draw(); };
     this.querySelector('[data-action="clear"]').onclick = () => { if (confirm("确定清空这张手写纸吗？")) { this.strokes = []; this.persist(); this.draw(); } };
     this.querySelector('[data-action="save"]').onclick = () => this.download();
+    this.querySelector('[data-action="review"]').onclick = () => this.review();
+    this.querySelector('[data-action="close-review"]').onclick = () => this.querySelector(".ai-review").classList.add("hidden");
   }
   resize() {
     const rect = this.canvas.getBoundingClientRect();
@@ -150,10 +152,77 @@ class HandwritingPad extends HTMLElement {
     }
   }
   download() {
-    const out = document.createElement("canvas"); out.width = this.canvas.width; out.height = this.canvas.height;
-    const c = out.getContext("2d"); c.fillStyle = "#fffefb"; c.fillRect(0,0,out.width,out.height); c.drawImage(this.canvas,0,0);
+    const out = this.imageCanvas();
     const a = document.createElement("a"); a.download = `${this.padId}-${todayKey()}.png`; a.href = out.toDataURL("image/png"); a.click();
     toast("手写图片已导出");
+  }
+  imageCanvas(maxSide = 1600) {
+    const scale = Math.min(1, maxSide / Math.max(this.canvas.width, this.canvas.height));
+    const out = document.createElement("canvas");
+    out.width = Math.max(1, Math.round(this.canvas.width * scale));
+    out.height = Math.max(1, Math.round(this.canvas.height * scale));
+    const c = out.getContext("2d");
+    c.fillStyle = "#fffefb"; c.fillRect(0, 0, out.width, out.height); c.drawImage(this.canvas, 0, 0, out.width, out.height);
+    return out;
+  }
+  reviewContext() {
+    const text = id => document.getElementById(id)?.textContent?.trim() || "";
+    const value = id => document.getElementById(id)?.value?.trim() || "";
+    const contexts = {
+      "word-pad": { task: "单词与搭配", prompt: text("wordPrompt"), reference: [text("wordMeaning"), text("wordCollocation"), text("wordExample")].filter(Boolean).join("；") },
+      "listening-pad": { task: "听写与错因", prompt: "识别手写的英语听写内容，并检查可确定的拼写和语法问题。没有音频原文时不要臆测漏听内容。", reference: "" },
+      "reading-pad": { task: "阅读概括与同义替换", prompt: value("readingText").slice(0, 5000), reference: "" },
+      "speaking-pad": { task: `雅思口语提纲 ${text("speakingPart")}`, prompt: text("speakingPrompt"), reference: "提纲应以关键词为主，结构清楚，便于脱稿表达。" },
+      "writing-pad": { task: `雅思写作 ${text("writingType")}`, prompt: text("writingPrompt"), reference: "检查是否回应题目，并重点检查拼写、主谓一致、时态、冠词、句子完整性和衔接。" }
+    };
+    return contexts[this.padId] || { task: this.getAttribute("title") || "英语手写练习", prompt: "", reference: "" };
+  }
+  appendReviewLine(container, label, value, className = "") {
+    if (!value || (Array.isArray(value) && !value.length)) return;
+    const block = document.createElement("div"); block.className = `ai-review-block ${className}`.trim();
+    const heading = document.createElement("b"); heading.textContent = label; block.appendChild(heading);
+    if (Array.isArray(value)) {
+      const list = document.createElement("ul");
+      value.forEach(item => { const li = document.createElement("li"); li.textContent = String(item); list.appendChild(li); });
+      block.appendChild(list);
+    } else {
+      const p = document.createElement("p"); p.textContent = String(value); block.appendChild(p);
+    }
+    container.appendChild(block);
+  }
+  renderReview(data) {
+    const panel = this.querySelector(".ai-review");
+    const body = this.querySelector(".ai-review-body"); body.replaceChildren();
+    if (data.score !== undefined && data.score !== null) {
+      const score = document.createElement("div"); score.className = "ai-score"; score.textContent = `${data.score} 分`; body.appendChild(score);
+    }
+    this.appendReviewLine(body, "识别内容", data.recognized_text);
+    this.appendReviewLine(body, "总体评价", data.summary);
+    this.appendReviewLine(body, "做得好的地方", data.strengths, "positive");
+    this.appendReviewLine(body, "需要修改", data.corrections, "warning");
+    this.appendReviewLine(body, "参考改写", data.rewrite, "rewrite");
+    this.appendReviewLine(body, "下一步", data.next_step);
+    panel.classList.remove("hidden"); panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  async review() {
+    if (!this.strokes.length) { toast("请先手写答案，再进行批改"); return; }
+    const button = this.querySelector('[data-action="review"]');
+    const original = button.textContent; button.disabled = true; button.textContent = "正在识别…";
+    try {
+      const response = await fetch("/api/handwriting-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: this.imageCanvas().toDataURL("image/jpeg", .82), padId: this.padId, ...this.reviewContext() })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "暂时无法完成批改");
+      this.renderReview(data);
+      toast("AI批改完成");
+    } catch (error) {
+      toast(error.message || "批改失败，请稍后重试");
+    } finally {
+      button.disabled = false; button.textContent = original;
+    }
   }
 }
 customElements.define("handwriting-pad", HandwritingPad);
