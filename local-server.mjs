@@ -1,22 +1,33 @@
 import http from "node:http";
-import { readFile, stat } from "node:fs/promises";
-import path from "node:path";
+import { Readable } from "node:stream";
+import worker from "./dist/server/index.js";
 
-const root = path.resolve("dist");
-const types = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8", ".webmanifest": "application/manifest+json; charset=utf-8" };
+const env = {
+  DASHSCOPE_API_KEY: process.env.DASHSCOPE_API_KEY || "",
+  DASHSCOPE_BASE_URL: process.env.DASHSCOPE_BASE_URL || "",
+  DASHSCOPE_MODEL: process.env.DASHSCOPE_MODEL || "qwen3-vl-flash"
+};
+const port = Number(process.env.PREVIEW_PORT || 4178);
+
 const server = http.createServer(async (req, res) => {
   try {
-    const pathname = decodeURIComponent(new URL(req.url, "http://localhost").pathname);
-    let file = path.resolve(root, `.${pathname === "/" ? "/index.html" : pathname}`);
-    if (!file.startsWith(root)) throw new Error("bad path");
-    if ((await stat(file)).isDirectory()) file = path.join(file, "index.html");
-    const body = await readFile(file);
-    res.writeHead(200, { "content-type": types[path.extname(file)] || "application/octet-stream", "cache-control": "no-store" });
-    res.end(body);
-  } catch {
-    res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
-    res.end("Not found");
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = chunks.length ? Buffer.concat(chunks) : undefined;
+    const request = new Request(`http://127.0.0.1:${port}${req.url}`, {
+      method: req.method,
+      headers: req.headers,
+      body: req.method === "GET" || req.method === "HEAD" ? undefined : body
+    });
+    const response = await worker.fetch(request, env, {});
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    if (!response.body) return res.end();
+    Readable.fromWeb(response.body).pipe(res);
+  } catch (error) {
+    res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
+    res.end("Local preview error");
+    console.error(error);
   }
 });
 
-server.listen(4178, "127.0.0.1", () => console.log("Local: http://127.0.0.1:4178"));
+server.listen(port, "127.0.0.1", () => console.log(`Local: http://127.0.0.1:${port}`));
