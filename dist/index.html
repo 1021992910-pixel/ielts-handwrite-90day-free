@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#152b4f">
+  <meta name="description" content="为平板手写设计的三个月雅思学习台">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23152b4f'/%3E%3Cpath d='M17 45l7-19 6 14 7-25 10 30' fill='none' stroke='%23f0b75b' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <title>90天雅思手写学习台</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">IELTS · 90 DAY PATH</p>
+        <h1>90天雅思手写学习台</h1>
+      </div>
+      <div class="goal-chip">
+        <span>总分 6.5</span>
+        <span>口语 6+</span>
+        <span>听/读一项冲高</span>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="学习模块">
+      <button class="tab active" data-view="today">今日</button>
+      <button class="tab" data-view="words">单词</button>
+      <button class="tab" data-view="listening">听力</button>
+      <button class="tab" data-view="reading">阅读</button>
+      <button class="tab" data-view="speaking">口语</button>
+      <button class="tab" data-view="writing">写作</button>
+      <button class="tab" data-view="templates">背诵模板</button>
+      <button class="tab" data-view="progress">进度</button>
+    </nav>
+
+    <main>
+      <section class="view active" id="view-today">
+        <div class="dashboard-grid">
+          <article class="panel day-panel">
+            <div class="panel-head">
+              <div>
+                <p class="kicker" id="todayDate"></p>
+                <h2 id="dayTitle">第 1 天 · 建立学习闭环</h2>
+              </div>
+              <div class="ring" id="dailyRing"><span id="dailyPercent">0%</span></div>
+            </div>
+            <p class="lead">今天只完成这 5 件事。每件事都经历“学习→手写/录音→对照→修改→重做”。</p>
+            <div class="task-list" id="todayTasks"></div>
+          </article>
+
+          <aside class="panel phase-card">
+            <p class="kicker">当前阶段</p>
+            <h3 id="phaseTitle">基础期 · 第 1 周</h3>
+            <div class="phase-bar"><span id="phaseBar"></span></div>
+            <p id="phaseDescription">发音、基础语法、高频词和简短句子。</p>
+            <dl class="mini-stats">
+              <div><dt>连续学习</dt><dd id="streakStat">0 天</dd></div>
+              <div><dt>今日完成</dt><dd id="todayStat">0 / 5</dd></div>
+              <div><dt>累计完成</dt><dd id="totalStat">0 项</dd></div>
+            </dl>
+            <button class="secondary full" data-jump="progress">调整起始日期</button>
+          </aside>
+        </div>
+
+        <article class="panel compact-note">
+          <strong>今天的原则</strong>
+          <span>完成比完美更重要。不熟的内容记入错题，后面按间隔反复出现。</span>
+        </article>
+      </section>
+
+      <section class="view" id="view-words">
+        <div class="section-title">
+          <div><p class="kicker">60 分钟</p><h2>单词与搭配</h2></div>
+          <div class="segmented" role="group" aria-label="测试方向">
+            <button class="active" data-direction="en-zh">英 → 中</button>
+            <button data-direction="zh-en">中 → 英</button>
+          </div>
+        </div>
+        <div class="two-col">
+          <article class="panel word-card">
+            <div class="word-meta"><span id="wordProgress">今日 0 / 30</span><span id="wordDue">待复习 0</span></div>
+            <div class="word-prompt" id="wordPrompt">environment</div>
+            <button class="icon-button" id="speakWord" aria-label="播放发音">🔊 听发音</button>
+            <div class="answer-box hidden" id="wordAnswer">
+              <strong id="wordMeaning">环境</strong>
+              <p id="wordCollocation">protect the environment · 保护环境</p>
+              <p id="wordExample">We should protect the environment.</p>
+            </div>
+            <button class="primary full" id="revealWord">对照答案</button>
+            <div class="rating-grid hidden" id="wordRatings">
+              <button data-rating="0">不认识</button>
+              <button data-rating="1">眼熟</button>
+              <button data-rating="2">知道意思</button>
+              <button data-rating="3">会搭配</button>
+              <button data-rating="4">会造句</button>
+            </div>
+          </article>
+          <handwriting-pad pad-id="word-pad" title="请手写答案" hint="写出意思、英文或搭配"></handwriting-pad>
+        </div>
+        <article class="panel import-card">
+          <div><h3>词库管理</h3><p>可导入您的雅思词库。每行格式：<code>English=Chinese|collocation|example</code></p></div>
+          <label class="file-button">导入 TXT/CSV<input type="file" id="wordImport" accept=".txt,.csv,text/plain,text/csv"></label>
+        </article>
+      </section>
+
+      <section class="view" id="view-listening">
+        <div class="section-title"><div><p class="kicker">60 分钟</p><h2>听力精听闭环</h2></div></div>
+        <div class="two-col">
+          <article class="panel media-panel">
+            <h3>1. 选择今天的音频</h3>
+            <p class="muted">选择平板里的英语音频。音频只在当前设备中使用。</p>
+            <label class="file-button large">选择音频<input type="file" id="audioFile" accept="audio/*"></label>
+            <p class="file-name" id="audioName">尚未选择</p>
+            <audio id="audioPlayer" controls playsinline></audio>
+            <div class="speed-row">
+              <span>速度</span>
+              <button data-speed="0.75">0.75×</button>
+              <button class="active" data-speed="1">1×</button>
+              <button data-speed="1.25">1.25×</button>
+              <button id="backTen">−10 秒</button>
+            </div>
+            <ol class="loop-steps">
+              <li>第一遍盲听，手写听到的关键词。</li>
+              <li>对照原文，标记漏听、连读和拼写。</li>
+              <li>逐句跟读，再听一遍。</li>
+            </ol>
+            <button class="primary full complete-module" data-module="listening">完成今日听力</button>
+          </article>
+          <handwriting-pad pad-id="listening-pad" title="听写与错因" hint="用 Apple Pencil 或手指书写"></handwriting-pad>
+        </div>
+      </section>
+
+      <section class="view" id="view-reading">
+        <div class="section-title"><div><p class="kicker">75 分钟</p><h2>阅读理解与同义替换</h2></div></div>
+        <div class="two-col reading-layout">
+          <article class="panel reading-panel">
+            <label for="readingText"><strong>粘贴今天的阅读材料</strong></label>
+            <textarea id="readingText" rows="14" placeholder="把今天的英语短文粘贴在这里……"></textarea>
+            <div class="reading-tools">
+              <button class="secondary" id="saveReading">保存材料</button>
+              <button class="secondary" id="readingFocus">大字阅读</button>
+            </div>
+            <div class="checklist small">
+              <label><input type="checkbox" data-reading-step="main">写出每段大意</label>
+              <label><input type="checkbox" data-reading-step="structure">划出主语和动词</label>
+              <label><input type="checkbox" data-reading-step="synonym">记录 5 组同义替换</label>
+              <label><input type="checkbox" data-reading-step="redo">重做错题并写出错因</label>
+            </div>
+            <button class="primary full complete-module" data-module="reading">完成今日阅读</button>
+          </article>
+          <handwriting-pad pad-id="reading-pad" title="段落大意与同义替换" hint="手写概括、定位词和错因"></handwriting-pad>
+        </div>
+      </section>
+
+      <section class="view" id="view-speaking">
+        <div class="section-title"><div><p class="kicker">45 分钟</p><h2>口语录音与重说</h2></div></div>
+        <div class="two-col">
+          <article class="panel speaking-card">
+            <div class="word-meta"><span id="speakingPart">Part 1</span><button class="text-button" id="nextPrompt">换一题</button></div>
+            <h3 id="speakingPrompt">What do you usually do in the morning?</h3>
+            <div class="answer-frame">
+              <span>直接回答</span><b>→</b><span>理由</span><b>→</b><span>个人例子</span>
+            </div>
+            <div class="timer" id="speakingTimer">00:00</div>
+            <div class="record-controls">
+              <button class="record" id="recordButton">● 开始录音</button>
+              <button class="secondary" id="timerButton">开始计时</button>
+            </div>
+            <audio id="recordingPlayback" controls playsinline></audio>
+            <p class="muted" id="recordStatus">先说一遍，回听后修改，再说一遍。</p>
+            <button class="primary full complete-module" data-module="speaking">完成今日口语</button>
+          </article>
+          <handwriting-pad pad-id="speaking-pad" title="口语提纲" hint="只写关键词，不写整段答案"></handwriting-pad>
+        </div>
+      </section>
+
+      <section class="view" id="view-writing">
+        <div class="section-title"><div><p class="kicker">60 分钟</p><h2>写作：从正确句子开始</h2></div></div>
+        <div class="two-col">
+          <article class="panel writing-card">
+            <div class="word-meta"><span id="writingType">基础句</span><button class="text-button" id="nextWriting">换一题</button></div>
+            <h3 id="writingPrompt">用 5–8 个英语句子介绍你的日常作息。</h3>
+            <div class="writing-steps">
+              <div><b>1</b><span>圈出题目中的任务词</span></div>
+              <div><b>2</b><span>写中心句和关键词</span></div>
+              <div><b>3</b><span>手写第一版</span></div>
+              <div><b>4</b><span>检查主语、动词、时态和拼写</span></div>
+              <div><b>5</b><span>根据批改重写一遍</span></div>
+            </div>
+            <button class="primary full complete-module" data-module="writing">完成今日写作</button>
+          </article>
+          <handwriting-pad pad-id="writing-pad" title="写作纸" hint="建议横屏书写，可导出图片"></handwriting-pad>
+        </div>
+      </section>
+
+      <section class="view" id="view-templates">
+        <div class="section-title">
+          <div><p class="kicker">第 5 周起重点使用</p><h2>答案模板与背诵</h2></div>
+          <button class="primary" id="newTemplate">＋ 新建模板</button>
+        </div>
+        <div class="template-layout">
+          <aside class="panel template-list" id="templateList"></aside>
+          <article class="panel template-editor">
+            <div class="editor-head">
+              <select id="templateType" aria-label="模板类型">
+                <option>口语 Part 1</option><option>口语 Part 2</option><option>口语 Part 3</option>
+                <option>写作 Task 1</option><option>写作 Task 2</option>
+              </select>
+              <button class="secondary" id="memoryMode">进入背诵模式</button>
+            </div>
+            <label>话题<input id="templateTitle" placeholder="例如：我的家乡"></label>
+            <label>关键词<input id="templateKeywords" placeholder="例如：small city / friendly / riverside"></label>
+            <label>答题结构<textarea id="templateStructure" rows="3" placeholder="直接回答 → 理由 → 例子"></textarea></label>
+            <label>可替换句块<textarea id="templateChunks" rows="5" placeholder="I come from... / What I like most is..."></textarea></label>
+            <label>我的完整答案<textarea id="templateAnswer" rows="8" placeholder="用自己的经历完成答案……"></textarea></label>
+            <div class="template-actions">
+              <button class="primary" id="saveTemplate">保存模板</button>
+              <button class="secondary" id="practiceTemplate">关键词脱稿练习</button>
+            </div>
+          </article>
+        </div>
+        <div class="memory-overlay hidden" id="memoryOverlay" role="dialog" aria-modal="true" aria-labelledby="memoryTitle">
+          <div class="memory-card">
+            <button class="close-button" id="closeMemory" aria-label="关闭">×</button>
+            <p class="kicker" id="memoryType"></p>
+            <h2 id="memoryTitle"></h2>
+            <p class="memory-keywords" id="memoryKeywords"></p>
+            <p class="memory-structure" id="memoryStructure"></p>
+            <div class="memory-answer hidden" id="memoryAnswer"></div>
+            <button class="primary full" id="revealMemory">显示完整答案</button>
+            <div class="rating-row hidden" id="memoryRatings"><button data-memory="forgot">需要再背</button><button data-memory="hard">有些卡顿</button><button data-memory="good">可以脱稿</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-progress">
+        <div class="section-title"><div><p class="kicker">只看进步，不做整套测试</p><h2>90 天学习进度</h2></div></div>
+        <div class="stats-grid">
+          <article class="stat-card"><span>学习天数</span><strong id="progressDays">0</strong></article>
+          <article class="stat-card"><span>完成任务</span><strong id="progressTasks">0</strong></article>
+          <article class="stat-card"><span>复习单词</span><strong id="progressWords">0</strong></article>
+          <article class="stat-card"><span>背诵模板</span><strong id="progressTemplates">0</strong></article>
+        </div>
+        <div class="two-col">
+          <article class="panel">
+            <h3>设置学习起始日期</h3>
+            <p class="muted">网站会根据起始日期计算当前周次和任务。</p>
+            <label>起始日期<input type="date" id="startDate"></label>
+            <button class="primary" id="saveStartDate">保存日期</button>
+            <hr>
+            <h3>数据备份</h3>
+            <p class="muted">学习数据保存在这台设备上。定期导出备份，换设备后可恢复。</p>
+            <div class="backup-row">
+              <button class="secondary" id="exportData">导出备份</button>
+              <label class="file-button">导入备份<input type="file" id="importData" accept=".json,application/json"></label>
+            </div>
+          </article>
+          <article class="panel">
+            <h3>12 周路线</h3>
+            <div class="roadmap" id="roadmap"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+  <script src="./app.js"></script>
+</body>
+</html>
