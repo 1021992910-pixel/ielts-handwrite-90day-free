@@ -107,6 +107,45 @@
 
       <section class="view" id="view-listening">
         <div class="section-title"><div><p class="kicker">60 分钟</p><h2>听力精听闭环</h2></div></div>
+        <div class="two-col spelling-layout">
+          <article class="panel spelling-card">
+            <div class="word-meta">
+              <span id="spellingSource">机经拼写 · 第一批</span>
+              <span id="spellingProgress">今日 0 / 20</span>
+            </div>
+            <label class="spelling-set-label" for="spellingSetSelect">本周练习组</label>
+            <select id="spellingSetSelect" class="spelling-set-select" aria-label="选择拼写练习组"></select>
+            <p class="muted spelling-note" id="spellingSetNote"></p>
+            <div class="segmented spelling-mode" aria-label="拼写练习方式">
+              <button class="active" data-spelling-mode="audio">听写</button>
+              <button data-spelling-mode="zh-en">看中文写英文</button>
+            </div>
+            <div class="spelling-prompt" id="spellingPrompt">点击播放，听清后手写英文</div>
+            <div class="spelling-actions">
+              <button class="secondary" id="playSpelling">🔊 播放单词</button>
+              <button class="primary" id="revealSpelling">对照答案</button>
+            </div>
+            <div class="answer-box hidden" id="spellingAnswer">
+              <strong id="spellingEnglish"></strong>
+              <p id="spellingChinese"></p>
+            </div>
+            <div class="rating-row hidden" id="spellingRatings">
+              <button data-spelling-rating="wrong">写错了</button>
+              <button data-spelling-rating="close">差一点</button>
+              <button data-spelling-rating="correct">写对了</button>
+            </div>
+            <div class="spelling-summary">
+              <span id="spellingWrong">错词 0</span>
+              <span>每天完成 20 个，错词会优先再出现</span>
+            </div>
+          </article>
+          <handwriting-pad pad-id="spelling-pad" title="机经拼写手写区" hint="听或看中文后，用 Apple Pencil 写英文"></handwriting-pad>
+        </div>
+        <article class="panel compact-note spelling-guide">
+          <strong>使用顺序</strong>
+          <span>播放或看中文 → 手写英文 → 点“AI识别批改” → 对照答案 → 记录写错/差一点/写对。</span>
+        </article>
+        <div class="section-title listening-subtitle"><div><p class="kicker">自选材料</p><h2>音频精听</h2></div></div>
         <div class="two-col">
           <article class="panel media-panel">
             <h3>1. 选择今天的音频</h3>
@@ -267,6 +306,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
+  <script src="./spelling-data.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

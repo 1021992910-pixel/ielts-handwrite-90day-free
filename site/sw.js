@@ -1,5 +1,5 @@
-const CACHE = "ielts-handwrite-v2";
-const FILES = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest"];
+const CACHE = "ielts-handwrite-v3";
+const FILES = ["./", "./index.html", "./styles.css", "./spelling-data.js", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)));

@@ -94,6 +94,18 @@ main { padding-top: 22px; }
 .file-button input { position: absolute; opacity: 0; pointer-events: none; }
 .file-button.large { width: 100%; min-height: 54px; }
 .media-panel audio, .speaking-card audio { width: 100%; margin: 14px 0; }
+.spelling-layout { margin-bottom: 18px; }
+.spelling-card { text-align: center; }
+.spelling-set-label { display: block; margin: 18px 0 7px; color: #435670; font-weight: 750; text-align: left; }
+.spelling-set-select { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfe; color: var(--navy); font-weight: 750; }
+.spelling-note { min-height: 48px; margin: 10px 0 14px; text-align: left; }
+.spelling-mode { width: fit-content; margin: 0 auto; }
+.spelling-prompt { min-height: 118px; display: grid; place-items: center; padding: 22px 8px; color: var(--navy); font-size: clamp(1.45rem, 3vw, 2.25rem); font-weight: 800; line-height: 1.35; }
+.spelling-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.spelling-summary { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; color: var(--muted); font-size: .88rem; text-align: left; }
+.spelling-summary span:first-child { color: var(--danger); font-weight: 800; white-space: nowrap; }
+.spelling-guide { margin-bottom: 24px; }
+.listening-subtitle { margin-top: 30px; }
 .file-name { margin: 8px 0 0; color: var(--muted); font-size: .9rem; text-align: center; }
 .muted { color: var(--muted); }
 .speed-row { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
@@ -192,6 +204,8 @@ handwriting-pad { display: block; }
   .rating-grid { grid-template-columns: 1fr 1fr; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .record-controls, .rating-row { grid-template-columns: 1fr; }
+  .spelling-actions { grid-template-columns: 1fr; }
+  .spelling-summary { display: grid; }
   .pad-head { display: block; }
   .pad-tools { justify-content: flex-start; margin-top: 10px; }
   .canvas-wrap { min-height: 430px; }

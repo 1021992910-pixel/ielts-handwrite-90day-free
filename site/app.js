@@ -5,6 +5,9 @@ const defaultState = {
   completions: {},
   wordStats: {},
   wordReviewed: 0,
+  spellingStats: {},
+  spellingReviewed: 0,
+  spellingSetIndex: 0,
   templatesPracticed: 0,
   templates: [],
   readingText: "",
@@ -17,6 +20,7 @@ function loadState() {
   catch { return { ...defaultState }; }
 }
 let state = loadState();
+state.spellingStats ||= {};
 function saveState() { localStorage.setItem(APP_KEY, JSON.stringify(state)); }
 
 const coreWords = [
@@ -156,6 +160,12 @@ class HandwritingPad extends HTMLElement {
     const a = document.createElement("a"); a.download = `${this.padId}-${todayKey()}.png`; a.href = out.toDataURL("image/png"); a.click();
     toast("手写图片已导出");
   }
+  clearForNext() {
+    this.strokes = [];
+    this.persist();
+    this.draw();
+    this.querySelector(".ai-review")?.classList.add("hidden");
+  }
   imageCanvas(maxSide = 1600) {
     const scale = Math.min(1, maxSide / Math.max(this.canvas.width, this.canvas.height));
     const out = document.createElement("canvas");
@@ -170,6 +180,7 @@ class HandwritingPad extends HTMLElement {
     const value = id => document.getElementById(id)?.value?.trim() || "";
     const contexts = {
       "word-pad": { task: "单词与搭配", prompt: text("wordPrompt"), reference: [text("wordMeaning"), text("wordCollocation"), text("wordExample")].filter(Boolean).join("；") },
+      "spelling-pad": { task: "雅思听力机经拼写", prompt: text("spellingPrompt"), reference: [text("spellingEnglish"), text("spellingChinese")].filter(Boolean).join("；") },
       "listening-pad": { task: "听写与错因", prompt: "识别手写的英语听写内容，并检查可确定的拼写和语法问题。没有音频原文时不要臆测漏听内容。", reference: "" },
       "reading-pad": { task: "阅读概括与同义替换", prompt: value("readingText").slice(0, 5000), reference: "" },
       "speaking-pad": { task: `雅思口语提纲 ${text("speakingPart")}`, prompt: text("speakingPrompt"), reference: "提纲应以关键词为主，结构清楚，便于脱稿表达。" },
@@ -230,7 +241,7 @@ customElements.define("handwriting-pad", HandwritingPad);
 const taskDefs = [
   ["words", "单词与搭配", "30–40 个新词 + 到期复习"],
   ["reading", "阅读", "句子主干、段落大意、同义替换"],
-  ["listening", "听力", "盲听、对照、跟读、再听"],
+  ["listening", "听力", "机经拼写 20 个 + 盲听、对照、跟读"],
   ["speaking", "口语", "准备、录音、回听、重说"],
   ["writing", "语法与写作", "正确句子、检查、重写"]
 ];
@@ -320,6 +331,83 @@ document.getElementById("wordImport").onchange = async (e) => {
   const map = new Map(state.customWords.map(w => [w[0].toLowerCase(), w])); parsed.forEach(w => map.set(w[0].toLowerCase(), w)); state.customWords = [...map.values()]; saveState(); nextWord(); toast(`已导入 ${parsed.length} 个单词`);
 };
 
+const spellingSets = window.IELTSSpellingData?.sets || [];
+let spellingMode = "audio", currentSpelling = null, spellingToday = 0, spellingQueue = [];
+
+function spellingKey(word) { return word.toLowerCase(); }
+function activeSpellingSet() { return spellingSets[state.spellingSetIndex] || spellingSets[0]; }
+function rebuildSpellingQueue() {
+  const set = activeSpellingSet();
+  if (!set) { spellingQueue = []; return; }
+  const due = set.words.filter(([word]) => {
+    const stat = state.spellingStats[spellingKey(word)];
+    return !stat || !stat.next || stat.next <= todayKey() || stat.rating !== "correct";
+  });
+  const pool = due.length ? due : set.words;
+  spellingQueue = [...pool].sort(() => Math.random() - .5);
+}
+function renderSpellingMeta() {
+  const set = activeSpellingSet();
+  document.getElementById("spellingSetNote").textContent = set?.note || "";
+  document.getElementById("spellingProgress").textContent = `今日 ${spellingToday} / 20`;
+  const wrong = Object.values(state.spellingStats).filter(s => s.rating === "wrong" || s.rating === "close").length;
+  document.getElementById("spellingWrong").textContent = `错词 ${wrong}`;
+}
+function playCurrentSpelling() {
+  if (!currentSpelling) return;
+  const utter = new SpeechSynthesisUtterance(currentSpelling[0]);
+  utter.lang = "en-GB"; utter.rate = .82;
+  speechSynthesis.cancel(); speechSynthesis.speak(utter);
+}
+function nextSpelling() {
+  if (!spellingQueue.length) rebuildSpellingQueue();
+  currentSpelling = spellingQueue.shift() || activeSpellingSet()?.words[0] || null;
+  if (!currentSpelling) return;
+  document.getElementById("spellingPrompt").textContent = spellingMode === "audio" ? "点击播放，听清后手写英文" : currentSpelling[1];
+  document.getElementById("spellingEnglish").textContent = currentSpelling[0];
+  document.getElementById("spellingChinese").textContent = currentSpelling[1];
+  document.getElementById("spellingAnswer").classList.add("hidden");
+  document.getElementById("spellingRatings").classList.add("hidden");
+  document.getElementById("revealSpelling").classList.remove("hidden");
+  renderSpellingMeta();
+}
+function initSpelling() {
+  const select = document.getElementById("spellingSetSelect");
+  spellingSets.forEach((set, index) => {
+    const option = document.createElement("option"); option.value = index; option.textContent = set.title; select.appendChild(option);
+  });
+  if (state.spellingSetIndex >= spellingSets.length) state.spellingSetIndex = 0;
+  select.value = String(state.spellingSetIndex);
+  select.onchange = () => {
+    state.spellingSetIndex = Number(select.value); saveState(); spellingQueue = []; nextSpelling();
+    document.querySelector('[pad-id="spelling-pad"]')?.clearForNext();
+  };
+  document.querySelectorAll("[data-spelling-mode]").forEach(button => button.onclick = () => {
+    spellingMode = button.dataset.spellingMode;
+    document.querySelectorAll("[data-spelling-mode]").forEach(item => item.classList.toggle("active", item === button));
+    nextSpelling();
+  });
+  document.getElementById("playSpelling").onclick = playCurrentSpelling;
+  document.getElementById("revealSpelling").onclick = () => {
+    document.getElementById("spellingAnswer").classList.remove("hidden");
+    document.getElementById("spellingRatings").classList.remove("hidden");
+    document.getElementById("revealSpelling").classList.add("hidden");
+  };
+  document.querySelectorAll("[data-spelling-rating]").forEach(button => button.onclick = () => {
+    if (!currentSpelling) return;
+    const rating = button.dataset.spellingRating;
+    const gaps = { wrong: 1, close: 2, correct: 4 }, next = new Date();
+    next.setDate(next.getDate() + gaps[rating]);
+    state.spellingStats[spellingKey(currentSpelling[0])] = { rating, next: next.toISOString().slice(0, 10), last: todayKey() };
+    state.spellingReviewed = (state.spellingReviewed || 0) + 1; spellingToday++;
+    if (spellingToday >= 20) dayRecord().listening = true;
+    saveState(); renderToday(); renderProgress();
+    document.querySelector('[pad-id="spelling-pad"]')?.clearForNext();
+    nextSpelling();
+  });
+  nextSpelling();
+}
+
 const audioPlayer = document.getElementById("audioPlayer");
 document.getElementById("audioFile").onchange = (e) => { const file = e.target.files[0]; if (!file) return; audioPlayer.src = URL.createObjectURL(file); document.getElementById("audioName").textContent = file.name; };
 document.querySelectorAll("[data-speed]").forEach(btn => btn.onclick = () => { audioPlayer.playbackRate = Number(btn.dataset.speed); document.querySelectorAll("[data-speed]").forEach(b => b.classList.toggle("active", b === btn)); });
@@ -373,7 +461,7 @@ function renderProgress() {
   const completedTasks = Object.values(state.completions).reduce((n,d) => n + Object.values(d).filter(Boolean).length, 0);
   document.getElementById("progressDays").textContent = completedDays;
   document.getElementById("progressTasks").textContent = completedTasks;
-  document.getElementById("progressWords").textContent = state.wordReviewed;
+  document.getElementById("progressWords").textContent = (state.wordReviewed || 0) + (state.spellingReviewed || 0);
   document.getElementById("progressTemplates").textContent = state.templatesPracticed;
   document.getElementById("startDate").value = state.startDate;
   const current = planWeek(), roadmap = document.getElementById("roadmap"); roadmap.innerHTML = "";
@@ -385,4 +473,4 @@ document.getElementById("importData").onchange = async e => { const file = e.tar
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
 if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
-renderToday(); nextWord(); renderSpeaking(); renderWriting(); renderTemplates(); fillTemplate(); renderProgress();
+renderToday(); nextWord(); initSpelling(); renderSpeaking(); renderWriting(); renderTemplates(); fillTemplate(); renderProgress();
