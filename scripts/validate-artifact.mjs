@@ -9,6 +9,6 @@ const worker = (await import(`${pathToFileURL(workerPath).href}?v=${Date.now()}`
 if (!worker || typeof worker.fetch !== "function") throw new Error("Worker fetch export is missing");
 const home = await worker.fetch(new Request("https://example.test/"), {});
 if (home.status !== 200 || !(await home.text()).includes("90天雅思手写学习台")) throw new Error("Home page validation failed");
-const api = await worker.fetch(new Request("https://example.test/api/handwriting-review", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }), {});
-if (api.status !== 503) throw new Error("Unconfigured API guard validation failed");
+const api = await worker.fetch(new Request("https://example.test/local-only", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }), {});
+if (api.status !== 405) throw new Error("Static-only API guard validation failed");
 console.log("Worker artifact validated");

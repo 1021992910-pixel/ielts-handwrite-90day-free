@@ -7,6 +7,7 @@ const assetSpecs = [
   ["/index.html", "index.html", "text/html; charset=utf-8"],
   ["/styles.css", "styles.css", "text/css; charset=utf-8"],
   ["/spelling-data.js", "spelling-data.js", "text/javascript; charset=utf-8"],
+  ["/local-grader.js", "local-grader.js", "text/javascript; charset=utf-8"],
   ["/app.js", "app.js", "text/javascript; charset=utf-8"],
   ["/manifest.webmanifest", "manifest.webmanifest", "application/manifest+json; charset=utf-8"],
   ["/sw.js", "sw.js", "text/javascript; charset=utf-8"]

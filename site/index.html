@@ -14,13 +14,14 @@
   <div class="app-shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">IELTS · 90 DAY PATH</p>
+        <p class="eyebrow">IELTS · 90 DAY PATH · 免费离线版</p>
         <h1>90天雅思手写学习台</h1>
       </div>
       <div class="goal-chip">
         <span>总分 6.5</span>
         <span>口语 6+</span>
         <span>听/读一项冲高</span>
+        <span class="privacy-chip">无登录 · 无 Token</span>
       </div>
     </header>
 
@@ -83,6 +84,13 @@
             <div class="word-meta"><span id="wordProgress">今日 0 / 30</span><span id="wordDue">待复习 0</span></div>
             <div class="word-prompt" id="wordPrompt">environment</div>
             <button class="icon-button" id="speakWord" aria-label="播放发音">🔊 听发音</button>
+            <div class="scribble-box">
+              <label for="wordScribbleAnswer">✏️ Apple Pencil 随手写答题</label>
+              <textarea id="wordScribbleAnswer" rows="2" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="用 Apple Pencil 在这里写，iPad 会自动转成文字"></textarea>
+              <button class="primary full" id="checkWordAnswer">本地检查答案</button>
+              <div class="local-check-result hidden" id="wordCheckResult" role="status" aria-live="polite"></div>
+              <small>识别由 iPad 完成；答案只在当前设备比较，不会上传。</small>
+            </div>
             <div class="answer-box hidden" id="wordAnswer">
               <strong id="wordMeaning">环境</strong>
               <p id="wordCollocation">protect the environment · 保护环境</p>
@@ -121,6 +129,13 @@
               <button data-spelling-mode="zh-en">看中文写英文</button>
             </div>
             <div class="spelling-prompt" id="spellingPrompt">点击播放，听清后手写英文</div>
+            <div class="scribble-box">
+              <label for="spellingScribbleAnswer">✏️ Apple Pencil 随手写英文</label>
+              <textarea id="spellingScribbleAnswer" rows="2" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="用 Apple Pencil 写单词，iPad 会自动转成文字"></textarea>
+              <button class="primary full" id="checkSpellingAnswer">本地检查拼写</button>
+              <div class="local-check-result hidden" id="spellingCheckResult" role="status" aria-live="polite"></div>
+              <small>不会调用任何 AI 接口，也不会产生 Token 费用。</small>
+            </div>
             <div class="spelling-actions">
               <button class="secondary" id="playSpelling">🔊 播放单词</button>
               <button class="primary" id="revealSpelling">对照答案</button>
@@ -143,7 +158,7 @@
         </div>
         <article class="panel compact-note spelling-guide">
           <strong>使用顺序</strong>
-          <span>播放或看中文 → 手写英文 → 点“AI识别批改” → 对照答案 → 记录写错/差一点/写对。</span>
+          <span>播放或看中文 → 在随手写框用 Apple Pencil 写英文 → 点“本地检查拼写” → 根据结果记录写错/差一点/写对。</span>
         </article>
         <div class="section-title listening-subtitle"><div><p class="kicker">自选材料</p><h2>音频精听</h2></div></div>
         <div class="two-col">
@@ -307,6 +322,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
   <script src="./spelling-data.js"></script>
+  <script src="./local-grader.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

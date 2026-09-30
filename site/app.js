@@ -110,7 +110,7 @@ function dayRecord() {
 class HandwritingPad extends HTMLElement {
   connectedCallback() {
     this.padId = this.getAttribute("pad-id") || `pad-${Date.now()}`;
-    this.innerHTML = `<article class="panel pad-panel"><div class="pad-head"><div><strong>${this.getAttribute("title") || "手写板"}</strong><small>${this.getAttribute("hint") || ""}</small></div><div class="pad-tools"><button data-action="undo">撤销</button><button data-action="clear">清空</button><button data-action="save">导出图片</button><button class="ai-review-button" data-action="review">AI识别批改</button></div></div><div class="canvas-wrap"><canvas aria-label="手写区"></canvas></div><section class="ai-review hidden" aria-live="polite"><div class="ai-review-heading"><strong>AI批改结果</strong><button class="text-button" data-action="close-review">收起</button></div><div class="ai-review-body"></div></section></article>`;
+    this.innerHTML = `<article class="panel pad-panel"><div class="pad-head"><div><strong>${this.getAttribute("title") || "手写板"}</strong><small>${this.getAttribute("hint") || ""}</small></div><div class="pad-tools"><button data-action="undo">撤销</button><button data-action="clear">清空</button><button data-action="save">导出图片</button></div></div><div class="privacy-note">🔒 免费离线手写纸：笔迹只保存在这台设备，不上传云端。</div><div class="canvas-wrap"><canvas aria-label="手写区"></canvas></div></article>`;
     this.canvas = this.querySelector("canvas");
     this.ctx = this.canvas.getContext("2d");
     this.strokes = JSON.parse(localStorage.getItem(`${APP_KEY}:${this.padId}`) || "[]");
@@ -124,8 +124,6 @@ class HandwritingPad extends HTMLElement {
     this.querySelector('[data-action="undo"]').onclick = () => { this.strokes.pop(); this.persist(); this.draw(); };
     this.querySelector('[data-action="clear"]').onclick = () => { if (confirm("确定清空这张手写纸吗？")) { this.strokes = []; this.persist(); this.draw(); } };
     this.querySelector('[data-action="save"]').onclick = () => this.download();
-    this.querySelector('[data-action="review"]').onclick = () => this.review();
-    this.querySelector('[data-action="close-review"]').onclick = () => this.querySelector(".ai-review").classList.add("hidden");
   }
   resize() {
     const rect = this.canvas.getBoundingClientRect();
@@ -164,7 +162,6 @@ class HandwritingPad extends HTMLElement {
     this.strokes = [];
     this.persist();
     this.draw();
-    this.querySelector(".ai-review")?.classList.add("hidden");
   }
   imageCanvas(maxSide = 1600) {
     const scale = Math.min(1, maxSide / Math.max(this.canvas.width, this.canvas.height));
@@ -174,66 +171,6 @@ class HandwritingPad extends HTMLElement {
     const c = out.getContext("2d");
     c.fillStyle = "#fffefb"; c.fillRect(0, 0, out.width, out.height); c.drawImage(this.canvas, 0, 0, out.width, out.height);
     return out;
-  }
-  reviewContext() {
-    const text = id => document.getElementById(id)?.textContent?.trim() || "";
-    const value = id => document.getElementById(id)?.value?.trim() || "";
-    const contexts = {
-      "word-pad": { task: "单词与搭配", prompt: text("wordPrompt"), reference: [text("wordMeaning"), text("wordCollocation"), text("wordExample")].filter(Boolean).join("；") },
-      "spelling-pad": { task: "雅思听力机经拼写", prompt: text("spellingPrompt"), reference: [text("spellingEnglish"), text("spellingChinese")].filter(Boolean).join("；") },
-      "listening-pad": { task: "听写与错因", prompt: "识别手写的英语听写内容，并检查可确定的拼写和语法问题。没有音频原文时不要臆测漏听内容。", reference: "" },
-      "reading-pad": { task: "阅读概括与同义替换", prompt: value("readingText").slice(0, 5000), reference: "" },
-      "speaking-pad": { task: `雅思口语提纲 ${text("speakingPart")}`, prompt: text("speakingPrompt"), reference: "提纲应以关键词为主，结构清楚，便于脱稿表达。" },
-      "writing-pad": { task: `雅思写作 ${text("writingType")}`, prompt: text("writingPrompt"), reference: "检查是否回应题目，并重点检查拼写、主谓一致、时态、冠词、句子完整性和衔接。" }
-    };
-    return contexts[this.padId] || { task: this.getAttribute("title") || "英语手写练习", prompt: "", reference: "" };
-  }
-  appendReviewLine(container, label, value, className = "") {
-    if (!value || (Array.isArray(value) && !value.length)) return;
-    const block = document.createElement("div"); block.className = `ai-review-block ${className}`.trim();
-    const heading = document.createElement("b"); heading.textContent = label; block.appendChild(heading);
-    if (Array.isArray(value)) {
-      const list = document.createElement("ul");
-      value.forEach(item => { const li = document.createElement("li"); li.textContent = String(item); list.appendChild(li); });
-      block.appendChild(list);
-    } else {
-      const p = document.createElement("p"); p.textContent = String(value); block.appendChild(p);
-    }
-    container.appendChild(block);
-  }
-  renderReview(data) {
-    const panel = this.querySelector(".ai-review");
-    const body = this.querySelector(".ai-review-body"); body.replaceChildren();
-    if (data.score !== undefined && data.score !== null) {
-      const score = document.createElement("div"); score.className = "ai-score"; score.textContent = `${data.score} 分`; body.appendChild(score);
-    }
-    this.appendReviewLine(body, "识别内容", data.recognized_text);
-    this.appendReviewLine(body, "总体评价", data.summary);
-    this.appendReviewLine(body, "做得好的地方", data.strengths, "positive");
-    this.appendReviewLine(body, "需要修改", data.corrections, "warning");
-    this.appendReviewLine(body, "参考改写", data.rewrite, "rewrite");
-    this.appendReviewLine(body, "下一步", data.next_step);
-    panel.classList.remove("hidden"); panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
-  async review() {
-    if (!this.strokes.length) { toast("请先手写答案，再进行批改"); return; }
-    const button = this.querySelector('[data-action="review"]');
-    const original = button.textContent; button.disabled = true; button.textContent = "正在识别…";
-    try {
-      const response = await fetch("/api/handwriting-review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: this.imageCanvas().toDataURL("image/jpeg", .82), padId: this.padId, ...this.reviewContext() })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "暂时无法完成批改");
-      this.renderReview(data);
-      toast("AI批改完成");
-    } catch (error) {
-      toast(error.message || "批改失败，请稍后重试");
-    } finally {
-      button.disabled = false; button.textContent = original;
-    }
   }
 }
 customElements.define("handwriting-pad", HandwritingPad);
@@ -285,6 +222,20 @@ function renderToday() {
 
 let direction = "en-zh", currentWord = null, wordToday = 0;
 function words() { return [...coreWords, ...state.customWords]; }
+function setLocalResult(id, correct, message) {
+  const result = document.getElementById(id);
+  result.textContent = message;
+  result.classList.remove("hidden", "correct", "wrong");
+  result.classList.add(correct ? "correct" : "wrong");
+}
+function clearLocalResult(inputId, resultId) {
+  const input = document.getElementById(inputId);
+  const result = document.getElementById(resultId);
+  input.value = "";
+  result.textContent = "";
+  result.classList.add("hidden");
+  result.classList.remove("correct", "wrong");
+}
 function nextWord() {
   const all = words(), due = all.filter(w => {
     const stat = state.wordStats[w[0]]; return !stat || !stat.next || stat.next <= todayKey();
@@ -296,6 +247,10 @@ function nextWord() {
   document.getElementById("wordExample").textContent = currentWord[3] || "请用这个词造句。";
   document.getElementById("wordAnswer").classList.add("hidden"); document.getElementById("wordRatings").classList.add("hidden");
   document.getElementById("revealWord").classList.remove("hidden");
+  document.getElementById("wordScribbleAnswer").placeholder = direction === "en-zh"
+    ? "用 Apple Pencil 写中文意思，iPad 会自动转成文字"
+    : "用 Apple Pencil 写英文，iPad 会自动转成文字";
+  clearLocalResult("wordScribbleAnswer", "wordCheckResult");
   renderWordMeta();
 }
 function renderWordMeta() {
@@ -308,6 +263,19 @@ document.querySelectorAll("[data-direction]").forEach(btn => btn.onclick = () =>
 });
 document.getElementById("revealWord").onclick = () => {
   document.getElementById("wordAnswer").classList.remove("hidden"); document.getElementById("wordRatings").classList.remove("hidden"); document.getElementById("revealWord").classList.add("hidden");
+};
+document.getElementById("checkWordAnswer").onclick = () => {
+  if (!currentWord) return;
+  const raw = document.getElementById("wordScribbleAnswer").value.trim();
+  if (!raw) { toast("请先用 Apple Pencil 写出答案"); return; }
+  const expected = direction === "zh-en"
+    ? [currentWord[0]]
+    : String(currentWord[1]).split(/[；;,，、/]+/).filter(Boolean);
+  const correct = window.LocalGrader.matchesAny(raw, expected);
+  setLocalResult("wordCheckResult", correct, correct ? "✓ 写对了！识别结果与答案一致。" : `✗ 还需要复习。你的识别结果：${raw}`);
+  document.getElementById("wordAnswer").classList.remove("hidden");
+  document.getElementById("wordRatings").classList.remove("hidden");
+  document.getElementById("revealWord").classList.add("hidden");
 };
 document.querySelectorAll("[data-rating]").forEach(btn => btn.onclick = () => {
   const rating = Number(btn.dataset.rating), gaps = [0,1,2,4,7], next = new Date(); next.setDate(next.getDate() + gaps[rating]);
@@ -369,6 +337,7 @@ function nextSpelling() {
   document.getElementById("spellingAnswer").classList.add("hidden");
   document.getElementById("spellingRatings").classList.add("hidden");
   document.getElementById("revealSpelling").classList.remove("hidden");
+  clearLocalResult("spellingScribbleAnswer", "spellingCheckResult");
   renderSpellingMeta();
 }
 function initSpelling() {
@@ -388,6 +357,16 @@ function initSpelling() {
     nextSpelling();
   });
   document.getElementById("playSpelling").onclick = playCurrentSpelling;
+  document.getElementById("checkSpellingAnswer").onclick = () => {
+    if (!currentSpelling) return;
+    const raw = document.getElementById("spellingScribbleAnswer").value.trim();
+    if (!raw) { toast("请先用 Apple Pencil 写出英文单词"); return; }
+    const correct = window.LocalGrader.matchesAny(raw, [currentSpelling[0]]);
+    setLocalResult("spellingCheckResult", correct, correct ? "✓ 拼写正确！" : `✗ 拼写不一致。你的识别结果：${raw}`);
+    document.getElementById("spellingAnswer").classList.remove("hidden");
+    document.getElementById("spellingRatings").classList.remove("hidden");
+    document.getElementById("revealSpelling").classList.add("hidden");
+  };
   document.getElementById("revealSpelling").onclick = () => {
     document.getElementById("spellingAnswer").classList.remove("hidden");
     document.getElementById("spellingRatings").classList.remove("hidden");

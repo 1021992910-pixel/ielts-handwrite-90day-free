@@ -2,11 +2,6 @@ import http from "node:http";
 import { Readable } from "node:stream";
 import worker from "./dist/server/index.js";
 
-const env = {
-  DASHSCOPE_API_KEY: process.env.DASHSCOPE_API_KEY || "",
-  DASHSCOPE_BASE_URL: process.env.DASHSCOPE_BASE_URL || "",
-  DASHSCOPE_MODEL: process.env.DASHSCOPE_MODEL || "qwen3-vl-flash"
-};
 const port = Number(process.env.PREVIEW_PORT || 4178);
 
 const server = http.createServer(async (req, res) => {
@@ -19,7 +14,7 @@ const server = http.createServer(async (req, res) => {
       headers: req.headers,
       body: req.method === "GET" || req.method === "HEAD" ? undefined : body
     });
-    const response = await worker.fetch(request, env, {});
+    const response = await worker.fetch(request, {}, {});
     res.writeHead(response.status, Object.fromEntries(response.headers));
     if (!response.body) return res.end();
     Readable.fromWeb(response.body).pipe(res);
