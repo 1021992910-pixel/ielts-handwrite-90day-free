@@ -107,74 +107,6 @@ function dayRecord() {
   return state.completions[key];
 }
 
-class HandwritingPad extends HTMLElement {
-  connectedCallback() {
-    this.padId = this.getAttribute("pad-id") || `pad-${Date.now()}`;
-    this.innerHTML = `<article class="panel pad-panel"><div class="pad-head"><div><strong>${this.getAttribute("title") || "手写板"}</strong><small>${this.getAttribute("hint") || ""}</small></div><div class="pad-tools"><button data-action="undo">撤销</button><button data-action="clear">清空</button><button data-action="save">导出图片</button></div></div><div class="privacy-note">🔒 免费离线手写纸：笔迹只保存在这台设备，不上传云端。</div><div class="canvas-wrap"><canvas aria-label="手写区"></canvas></div></article>`;
-    this.canvas = this.querySelector("canvas");
-    this.ctx = this.canvas.getContext("2d");
-    this.strokes = JSON.parse(localStorage.getItem(`${APP_KEY}:${this.padId}`) || "[]");
-    this.activeStroke = null;
-    this.resizeObserver = new ResizeObserver(() => this.resize());
-    this.resizeObserver.observe(this.querySelector(".canvas-wrap"));
-    this.canvas.addEventListener("pointerdown", (e) => this.down(e));
-    this.canvas.addEventListener("pointermove", (e) => this.move(e));
-    this.canvas.addEventListener("pointerup", () => this.up());
-    this.canvas.addEventListener("pointercancel", () => this.up());
-    this.querySelector('[data-action="undo"]').onclick = () => { this.strokes.pop(); this.persist(); this.draw(); };
-    this.querySelector('[data-action="clear"]').onclick = () => { if (confirm("确定清空这张手写纸吗？")) { this.strokes = []; this.persist(); this.draw(); } };
-    this.querySelector('[data-action="save"]').onclick = () => this.download();
-  }
-  resize() {
-    const rect = this.canvas.getBoundingClientRect();
-    const ratio = Math.max(1, window.devicePixelRatio || 1);
-    this.canvas.width = Math.round(rect.width * ratio); this.canvas.height = Math.round(rect.height * ratio);
-    this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0); this.draw();
-  }
-  point(e) {
-    const r = this.canvas.getBoundingClientRect();
-    return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, p: e.pressure || .5 };
-  }
-  down(e) { e.preventDefault(); this.canvas.setPointerCapture(e.pointerId); this.activeStroke = [this.point(e)]; this.strokes.push(this.activeStroke); }
-  move(e) { if (!this.activeStroke) return; e.preventDefault(); this.activeStroke.push(this.point(e)); this.draw(); }
-  up() { if (!this.activeStroke) return; this.activeStroke = null; this.persist(); this.draw(); }
-  persist() { localStorage.setItem(`${APP_KEY}:${this.padId}`, JSON.stringify(this.strokes)); }
-  draw() {
-    if (!this.ctx) return;
-    const r = this.canvas.getBoundingClientRect(); this.ctx.clearRect(0, 0, r.width, r.height);
-    this.ctx.lineCap = "round"; this.ctx.lineJoin = "round"; this.ctx.strokeStyle = "#132a4b";
-    for (const stroke of this.strokes) {
-      if (!stroke.length) continue;
-      this.ctx.beginPath(); this.ctx.moveTo(stroke[0].x * r.width, stroke[0].y * r.height);
-      for (let i = 1; i < stroke.length; i++) {
-        const pt = stroke[i]; this.ctx.lineWidth = 2 + pt.p * 2.5; this.ctx.lineTo(pt.x * r.width, pt.y * r.height);
-      }
-      if (stroke.length === 1) this.ctx.lineTo(stroke[0].x * r.width + .2, stroke[0].y * r.height + .2);
-      this.ctx.stroke();
-    }
-  }
-  download() {
-    const out = this.imageCanvas();
-    const a = document.createElement("a"); a.download = `${this.padId}-${todayKey()}.png`; a.href = out.toDataURL("image/png"); a.click();
-    toast("手写图片已导出");
-  }
-  clearForNext() {
-    this.strokes = [];
-    this.persist();
-    this.draw();
-  }
-  imageCanvas(maxSide = 1600) {
-    const scale = Math.min(1, maxSide / Math.max(this.canvas.width, this.canvas.height));
-    const out = document.createElement("canvas");
-    out.width = Math.max(1, Math.round(this.canvas.width * scale));
-    out.height = Math.max(1, Math.round(this.canvas.height * scale));
-    const c = out.getContext("2d");
-    c.fillStyle = "#fffefb"; c.fillRect(0, 0, out.width, out.height); c.drawImage(this.canvas, 0, 0, out.width, out.height);
-    return out;
-  }
-}
-customElements.define("handwriting-pad", HandwritingPad);
-
 const taskDefs = [
   ["words", "单词与搭配", "30–40 个新词 + 到期复习"],
   ["reading", "阅读", "句子主干、段落大意、同义替换"],
@@ -222,35 +154,24 @@ function renderToday() {
 
 let direction = "en-zh", currentWord = null, wordToday = 0;
 function words() { return [...coreWords, ...state.customWords]; }
-function setLocalResult(id, correct, message) {
-  const result = document.getElementById(id);
-  result.textContent = message;
-  result.classList.remove("hidden", "correct", "wrong");
-  result.classList.add(correct ? "correct" : "wrong");
-}
-function clearLocalResult(inputId, resultId) {
-  const input = document.getElementById(inputId);
-  const result = document.getElementById(resultId);
-  input.value = "";
-  result.textContent = "";
-  result.classList.add("hidden");
-  result.classList.remove("correct", "wrong");
-}
-function nextWord() {
+function nextWord(preferred = null) {
   const all = words(), due = all.filter(w => {
     const stat = state.wordStats[w[0]]; return !stat || !stat.next || stat.next <= todayKey();
   });
-  currentWord = (due.length ? due : all)[Math.floor(Math.random() * (due.length ? due.length : all.length))];
+  const pool = (due.length ? due : all).filter(w => w[0] !== currentWord?.[0]);
+  currentWord = all.find(w => w[0] === preferred) || (pool.length ? pool : all)[Math.floor(Math.random() * (pool.length || all.length))];
+  state.activeWord = currentWord[0]; state.wordDirection = direction; saveState();
   document.getElementById("wordPrompt").textContent = direction === "en-zh" ? currentWord[0] : currentWord[1];
   document.getElementById("wordMeaning").textContent = direction === "en-zh" ? currentWord[1] : currentWord[0];
   document.getElementById("wordCollocation").textContent = currentWord[2] || "暂无搭配";
   document.getElementById("wordExample").textContent = currentWord[3] || "请用这个词造句。";
-  document.getElementById("wordAnswer").classList.add("hidden"); document.getElementById("wordRatings").classList.add("hidden");
-  document.getElementById("revealWord").classList.remove("hidden");
-  document.getElementById("wordScribbleAnswer").placeholder = direction === "en-zh"
-    ? "用 Apple Pencil 写中文意思，iPad 会自动转成文字"
-    : "用 Apple Pencil 写英文，iPad 会自动转成文字";
-  clearLocalResult("wordScribbleAnswer", "wordCheckResult");
+  document.getElementById("wordAnswer").classList.add("hidden");
+  document.getElementById("wordWorkspace").setQuestion({
+    id: `${direction}:${currentWord[0].toLowerCase()}`, module: "words", kind: direction === "en-zh" ? "meaning" : "spelling",
+    prompt: direction === "en-zh" ? currentWord[0] : currentWord[1],
+    expected: direction === "en-zh" ? currentWord[1].split(/[；;,，、/]+/).filter(Boolean) : [currentWord[0]],
+    title: direction === "en-zh" ? "写出中文意思" : "写出英文单词"
+  });
   renderWordMeta();
 }
 function renderWordMeta() {
@@ -261,25 +182,17 @@ function renderWordMeta() {
 document.querySelectorAll("[data-direction]").forEach(btn => btn.onclick = () => {
   direction = btn.dataset.direction; document.querySelectorAll("[data-direction]").forEach(b => b.classList.toggle("active", b === btn)); nextWord();
 });
-document.getElementById("revealWord").onclick = () => {
-  document.getElementById("wordAnswer").classList.remove("hidden"); document.getElementById("wordRatings").classList.remove("hidden"); document.getElementById("revealWord").classList.add("hidden");
-};
-document.getElementById("checkWordAnswer").onclick = () => {
-  if (!currentWord) return;
-  const raw = document.getElementById("wordScribbleAnswer").value.trim();
-  if (!raw) { toast("请先用 Apple Pencil 写出答案"); return; }
-  const expected = direction === "zh-en"
-    ? [currentWord[0]]
-    : String(currentWord[1]).split(/[；;,，、/]+/).filter(Boolean);
-  const correct = window.LocalGrader.matchesAny(raw, expected);
-  setLocalResult("wordCheckResult", correct, correct ? "✓ 写对了！识别结果与答案一致。" : `✗ 还需要复习。你的识别结果：${raw}`);
-  document.getElementById("wordAnswer").classList.remove("hidden");
-  document.getElementById("wordRatings").classList.remove("hidden");
-  document.getElementById("revealWord").classList.add("hidden");
-};
-document.querySelectorAll("[data-rating]").forEach(btn => btn.onclick = () => {
-  const rating = Number(btn.dataset.rating), gaps = [0,1,2,4,7], next = new Date(); next.setDate(next.getDate() + gaps[rating]);
-  state.wordStats[currentWord[0]] = { rating, next: next.toISOString().slice(0,10), last: todayKey() };
+document.getElementById("wordWorkspace").addEventListener("answer-graded", () => document.getElementById("wordAnswer").classList.remove("hidden"));
+document.getElementById("wordWorkspace").addEventListener("answer-invalidated", () => document.getElementById("wordAnswer").classList.add("hidden"));
+document.getElementById("wordWorkspace").addEventListener("answer-repeat", event => {
+  const question = event.detail; direction = question.kind === "meaning" ? "en-zh" : "zh-en";
+  document.querySelectorAll("[data-direction]").forEach(button => button.classList.toggle("active", button.dataset.direction === direction));
+  nextWord(question.id.slice(question.id.indexOf(":") + 1));
+});
+document.getElementById("wordWorkspace").addEventListener("answer-completed", event => {
+  const attempt = event.detail, word = attempt.question.id.slice(attempt.question.id.indexOf(":") + 1);
+  const correct = attempt.status === "correct", next = new Date(); next.setDate(next.getDate() + (correct ? 4 : 1));
+  state.wordStats[word] = { rating: correct ? 3 : 0, next: next.toISOString().slice(0, 10), last: todayKey(), reasons: attempt.reasons };
   state.wordReviewed++; wordToday++; if (wordToday >= 30) dayRecord().words = true;
   saveState(); renderToday(); renderProgress(); nextWord();
 });
@@ -335,9 +248,7 @@ function nextSpelling() {
   document.getElementById("spellingEnglish").textContent = currentSpelling[0];
   document.getElementById("spellingChinese").textContent = currentSpelling[1];
   document.getElementById("spellingAnswer").classList.add("hidden");
-  document.getElementById("spellingRatings").classList.add("hidden");
-  document.getElementById("revealSpelling").classList.remove("hidden");
-  clearLocalResult("spellingScribbleAnswer", "spellingCheckResult");
+  document.getElementById("spellingWorkspace").setQuestion({ id: `${spellingMode}:${currentSpelling[0].toLowerCase()}`, module: "listening", kind: "spelling", prompt: spellingMode === "audio" ? "听写英文单词" : currentSpelling[1], expected: [currentSpelling[0]], title: "机经拼写 · 本题答题纸" });
   renderSpellingMeta();
 }
 function initSpelling() {
@@ -349,7 +260,6 @@ function initSpelling() {
   select.value = String(state.spellingSetIndex);
   select.onchange = () => {
     state.spellingSetIndex = Number(select.value); saveState(); spellingQueue = []; nextSpelling();
-    document.querySelector('[pad-id="spelling-pad"]')?.clearForNext();
   };
   document.querySelectorAll("[data-spelling-mode]").forEach(button => button.onclick = () => {
     spellingMode = button.dataset.spellingMode;
@@ -357,31 +267,24 @@ function initSpelling() {
     nextSpelling();
   });
   document.getElementById("playSpelling").onclick = playCurrentSpelling;
-  document.getElementById("checkSpellingAnswer").onclick = () => {
-    if (!currentSpelling) return;
-    const raw = document.getElementById("spellingScribbleAnswer").value.trim();
-    if (!raw) { toast("请先用 Apple Pencil 写出英文单词"); return; }
-    const correct = window.LocalGrader.matchesAny(raw, [currentSpelling[0]]);
-    setLocalResult("spellingCheckResult", correct, correct ? "✓ 拼写正确！" : `✗ 拼写不一致。你的识别结果：${raw}`);
-    document.getElementById("spellingAnswer").classList.remove("hidden");
-    document.getElementById("spellingRatings").classList.remove("hidden");
-    document.getElementById("revealSpelling").classList.add("hidden");
-  };
-  document.getElementById("revealSpelling").onclick = () => {
-    document.getElementById("spellingAnswer").classList.remove("hidden");
-    document.getElementById("spellingRatings").classList.remove("hidden");
-    document.getElementById("revealSpelling").classList.add("hidden");
-  };
-  document.querySelectorAll("[data-spelling-rating]").forEach(button => button.onclick = () => {
-    if (!currentSpelling) return;
-    const rating = button.dataset.spellingRating;
-    const gaps = { wrong: 1, close: 2, correct: 4 }, next = new Date();
-    next.setDate(next.getDate() + gaps[rating]);
-    state.spellingStats[spellingKey(currentSpelling[0])] = { rating, next: next.toISOString().slice(0, 10), last: todayKey() };
+  document.getElementById("spellingWorkspace").addEventListener("answer-graded", () => document.getElementById("spellingAnswer").classList.remove("hidden"));
+  document.getElementById("spellingWorkspace").addEventListener("answer-invalidated", () => document.getElementById("spellingAnswer").classList.add("hidden"));
+  document.getElementById("spellingWorkspace").addEventListener("answer-repeat", event => {
+    const question = event.detail, word = question.expected[0];
+    spellingMode = question.id.startsWith("audio:") ? "audio" : "zh-en";
+    document.querySelectorAll("[data-spelling-mode]").forEach(button => button.classList.toggle("active", button.dataset.spellingMode === spellingMode));
+    const setIndex = spellingSets.findIndex(set => set.words.some(item => item[0] === word));
+    if (setIndex >= 0) { state.spellingSetIndex = setIndex; select.value = String(setIndex); saveState(); }
+    const entry = activeSpellingSet()?.words.find(item => item[0] === word);
+    if (entry) { spellingQueue.unshift(entry); nextSpelling(); }
+  });
+  document.getElementById("spellingWorkspace").addEventListener("answer-completed", event => {
+    const attempt = event.detail, rating = attempt.status === "correct" ? "correct" : "wrong", next = new Date();
+    next.setDate(next.getDate() + (rating === "correct" ? 4 : 1));
+    state.spellingStats[spellingKey(attempt.question.expected[0])] = { rating, next: next.toISOString().slice(0, 10), last: todayKey(), reasons: attempt.reasons };
     state.spellingReviewed = (state.spellingReviewed || 0) + 1; spellingToday++;
     if (spellingToday >= 20) dayRecord().listening = true;
     saveState(); renderToday(); renderProgress();
-    document.querySelector('[pad-id="spelling-pad"]')?.clearForNext();
     nextSpelling();
   });
   nextSpelling();
@@ -447,9 +350,27 @@ function renderProgress() {
   for (let w=1; w<=12; w++) { const el = document.createElement("div"); el.className = `week-row ${w < current ? "done" : w === current ? "current" : ""}`; const phase = w <= 4 ? "基础期" : w <= 8 ? "技能期" : "提分期"; el.innerHTML = `<strong>第 ${w} 周</strong><span>${phase}</span><span>${w < current ? "已经过" : w === current ? "当前" : "未开始"}</span>`; roadmap.appendChild(el); }
 }
 document.getElementById("saveStartDate").onclick = () => { const v = document.getElementById("startDate").value; if (!v) return; state.startDate = v; saveState(); renderToday(); renderProgress(); toast("起始日期已保存"); };
-document.getElementById("exportData").onclick = () => { const data = { state, pads: {} }; Object.keys(localStorage).filter(k => k.startsWith(`${APP_KEY}:`)).forEach(k => data.pads[k] = localStorage.getItem(k)); const blob = new Blob([JSON.stringify(data)], { type: "application/json" }); const a = document.createElement("a"); a.download = `雅思学习备份-${todayKey()}.json`; a.href = URL.createObjectURL(blob); a.click(); toast("备份已导出"); };
-document.getElementById("importData").onchange = async e => { const file = e.target.files[0]; if (!file) return; try { const data = JSON.parse(await file.text()); if (!data.state) throw new Error(); state = { ...defaultState, ...data.state }; saveState(); Object.entries(data.pads || {}).forEach(([k,v]) => localStorage.setItem(k,v)); location.reload(); } catch { toast("备份文件无法识别"); } };
-
+document.getElementById("exportData").onclick = async () => {
+  try {
+    await Promise.all([...document.querySelectorAll("handwriting-pad")].map(pad => { pad.up(); return pad.savePromise; }));
+    const data = { version: 2, state, pads: {}, notebook: await window.HandwritingNotebook.export() };
+    Object.keys(localStorage).filter(k => k.startsWith(`${APP_KEY}:`) && !k.includes("review")).forEach(k => data.pads[k] = localStorage.getItem(k));
+    const blob = new Blob([JSON.stringify(data)], { type: "application/json" }), url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.download = `雅思学习备份-${todayKey()}.json`; a.href = url; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); toast("笔迹、批改记录和进度已导出");
+  } catch { toast("备份未完成，请检查存储权限后重试"); }
+};
+document.getElementById("importData").onchange = async e => {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    const data = JSON.parse(await file.text()); if (!data.state || typeof data.state !== "object") throw new Error();
+    if (data.notebook) await window.HandwritingNotebook.import(data.notebook);
+    state = { ...defaultState, ...data.state }; saveState();
+    Object.entries(data.pads || {}).filter(([k, v]) => k.startsWith(`${APP_KEY}:`) && !k.includes("review") && typeof v === "string").forEach(([k,v]) => localStorage.setItem(k,v));
+    location.reload();
+  } catch { toast("备份文件无法识别或存储失败，请重试"); }
+};
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
 if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
-renderToday(); nextWord(); initSpelling(); renderSpeaking(); renderWriting(); renderTemplates(); fillTemplate(); renderProgress();
+direction = state.wordDirection === "zh-en" ? "zh-en" : "en-zh";
+document.querySelectorAll("[data-direction]").forEach(button => button.classList.toggle("active", button.dataset.direction === direction));
+renderToday(); nextWord(state.activeWord); initSpelling(); renderSpeaking(); renderWriting(); renderTemplates(); fillTemplate(); renderProgress();

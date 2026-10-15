@@ -14,14 +14,14 @@
   <div class="app-shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">IELTS · 90 DAY PATH · 免费离线版</p>
+        <p class="eyebrow">IELTS · 90 DAY PATH · 手写练习本</p>
         <h1>90天雅思手写学习台</h1>
       </div>
       <div class="goal-chip">
         <span>总分 6.5</span>
         <span>口语 6+</span>
         <span>听/读一项冲高</span>
-        <span class="privacy-chip">无登录 · 无 Token</span>
+        <span class="privacy-chip">免费本机识别 · 不上传笔迹</span>
       </div>
     </header>
 
@@ -84,28 +84,14 @@
             <div class="word-meta"><span id="wordProgress">今日 0 / 30</span><span id="wordDue">待复习 0</span></div>
             <div class="word-prompt" id="wordPrompt">environment</div>
             <button class="icon-button" id="speakWord" aria-label="播放发音">🔊 听发音</button>
-            <div class="scribble-box">
-              <label for="wordScribbleAnswer">✏️ Apple Pencil 随手写答题</label>
-              <textarea id="wordScribbleAnswer" rows="2" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="用 Apple Pencil 在这里写，iPad 会自动转成文字"></textarea>
-              <button class="primary full" id="checkWordAnswer">本地检查答案</button>
-              <div class="local-check-result hidden" id="wordCheckResult" role="status" aria-live="polite"></div>
-              <small>识别由 iPad 完成；答案只在当前设备比较，不会上传。</small>
-            </div>
+            <p class="answer-instruction">在本题答题纸上直接写出答案。写完点「提交批改」，再选择需要记录的错因。</p>
             <div class="answer-box hidden" id="wordAnswer">
               <strong id="wordMeaning">环境</strong>
               <p id="wordCollocation">protect the environment · 保护环境</p>
               <p id="wordExample">We should protect the environment.</p>
             </div>
-            <button class="primary full" id="revealWord">对照答案</button>
-            <div class="rating-grid hidden" id="wordRatings">
-              <button data-rating="0">不认识</button>
-              <button data-rating="1">眼熟</button>
-              <button data-rating="2">知道意思</button>
-              <button data-rating="3">会搭配</button>
-              <button data-rating="4">会造句</button>
-            </div>
           </article>
-          <handwriting-pad pad-id="word-pad" title="请手写答案" hint="写出意思、英文或搭配"></handwriting-pad>
+          <answer-workspace id="wordWorkspace" module="words"></answer-workspace>
         </div>
         <article class="panel import-card">
           <div><h3>词库管理</h3><p>可导入您的雅思词库。每行格式：<code>English=Chinese|collocation|example</code></p></div>
@@ -129,36 +115,24 @@
               <button data-spelling-mode="zh-en">看中文写英文</button>
             </div>
             <div class="spelling-prompt" id="spellingPrompt">点击播放，听清后手写英文</div>
-            <div class="scribble-box">
-              <label for="spellingScribbleAnswer">✏️ Apple Pencil 随手写英文</label>
-              <textarea id="spellingScribbleAnswer" rows="2" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="用 Apple Pencil 写单词，iPad 会自动转成文字"></textarea>
-              <button class="primary full" id="checkSpellingAnswer">本地检查拼写</button>
-              <div class="local-check-result hidden" id="spellingCheckResult" role="status" aria-live="polite"></div>
-              <small>不会调用任何 AI 接口，也不会产生 Token 费用。</small>
-            </div>
+            <p class="answer-instruction">直接在答题纸写英文，保留原笔迹。系统批改后，再记录您认为的错因。</p>
             <div class="spelling-actions">
               <button class="secondary" id="playSpelling">🔊 播放单词</button>
-              <button class="primary" id="revealSpelling">对照答案</button>
             </div>
             <div class="answer-box hidden" id="spellingAnswer">
               <strong id="spellingEnglish"></strong>
               <p id="spellingChinese"></p>
-            </div>
-            <div class="rating-row hidden" id="spellingRatings">
-              <button data-spelling-rating="wrong">写错了</button>
-              <button data-spelling-rating="close">差一点</button>
-              <button data-spelling-rating="correct">写对了</button>
             </div>
             <div class="spelling-summary">
               <span id="spellingWrong">错词 0</span>
               <span>每天完成 20 个，错词会优先再出现</span>
             </div>
           </article>
-          <handwriting-pad pad-id="spelling-pad" title="机经拼写手写区" hint="听或看中文后，用 Apple Pencil 写英文"></handwriting-pad>
+          <answer-workspace id="spellingWorkspace" module="listening"></answer-workspace>
         </div>
         <article class="panel compact-note spelling-guide">
           <strong>使用顺序</strong>
-          <span>播放或看中文 → 在随手写框用 Apple Pencil 写英文 → 点“本地检查拼写” → 根据结果记录写错/差一点/写对。</span>
+          <span>播放或看中文 → 在答题纸上写英文 → 提交批改 → 选择错因 → 下一题。答题记录可随时回看。</span>
         </article>
         <div class="section-title listening-subtitle"><div><p class="kicker">自选材料</p><h2>音频精听</h2></div></div>
         <div class="two-col">
@@ -310,6 +284,11 @@
               <button class="secondary" id="exportData">导出备份</button>
               <label class="file-button">导入备份<input type="file" id="importData" accept=".json,application/json"></label>
             </div>
+            <details class="review-connection">
+              <summary>免费手写批改怎么用</summary>
+              <p>进入“单词”，先切到“中 → 英”，在答题纸上写一个英文单词，点“提交批改”。首次使用需要加载免费模型，请保持页面打开。</p>
+              <p class="muted">模型在本机识别，不上传笔迹、不扣 Token、不需要密钥。英文拼写自动核对；中文释义按已收录的同义表达核对，未收录的表达暂不计对错。首次使用前请先导出原有学习记录。</p>
+            </details>
           </article>
           <article class="panel">
             <h3>12 周路线</h3>
@@ -323,6 +302,8 @@
   </div>
   <script src="./spelling-data.js"></script>
   <script src="./local-grader.js"></script>
+  <script src="./free-grader.js"></script>
+  <script src="./handwriting.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

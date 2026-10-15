@@ -1,1 +1,6 @@
 free-version-*.png
+qa-handwriting/
+.env
+.env.*
+!.env.example
+node_modules/
