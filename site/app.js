@@ -184,6 +184,7 @@ document.querySelectorAll("[data-direction]").forEach(btn => btn.onclick = () =>
 });
 document.getElementById("wordWorkspace").addEventListener("answer-graded", () => document.getElementById("wordAnswer").classList.remove("hidden"));
 document.getElementById("wordWorkspace").addEventListener("answer-invalidated", () => document.getElementById("wordAnswer").classList.add("hidden"));
+document.getElementById("wordWorkspace").addEventListener("answer-skipped", () => { nextWord(); toast("已暂存，本题不计对错，可在答题记录中重练"); });
 document.getElementById("wordWorkspace").addEventListener("answer-repeat", event => {
   const question = event.detail; direction = question.kind === "meaning" ? "en-zh" : "zh-en";
   document.querySelectorAll("[data-direction]").forEach(button => button.classList.toggle("active", button.dataset.direction === direction));
@@ -269,6 +270,7 @@ function initSpelling() {
   document.getElementById("playSpelling").onclick = playCurrentSpelling;
   document.getElementById("spellingWorkspace").addEventListener("answer-graded", () => document.getElementById("spellingAnswer").classList.remove("hidden"));
   document.getElementById("spellingWorkspace").addEventListener("answer-invalidated", () => document.getElementById("spellingAnswer").classList.add("hidden"));
+  document.getElementById("spellingWorkspace").addEventListener("answer-skipped", () => { nextSpelling(); toast("已暂存，本题不计对错，可在答题记录中重练"); });
   document.getElementById("spellingWorkspace").addEventListener("answer-repeat", event => {
     const question = event.detail, word = question.expected[0];
     spellingMode = question.id.startsWith("audio:") ? "audio" : "zh-en";

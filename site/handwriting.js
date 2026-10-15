@@ -139,7 +139,8 @@
     move(event) {
       if (!this.activeStroke || event.pointerId !== this.pointer) return;
       event.preventDefault();
-      for (const item of event.getCoalescedEvents?.() || [event]) {
+      const coalesced = event.getCoalescedEvents?.();
+      for (const item of coalesced?.length ? coalesced : [event]) {
         const point = this.point(item), last = this.activeStroke.points.at(-1);
         if (Math.hypot(point.x - last.x, point.y - last.y) > .0007) this.activeStroke.points.push(point);
       }
@@ -147,6 +148,10 @@
     }
     up(event) {
       if (!this.activeStroke || (event && event.pointerId !== this.pointer)) return;
+      if (event?.type === 'pointerup') {
+        const endpoint = this.point(event), last = this.activeStroke.points.at(-1);
+        if (Math.hypot(endpoint.x - last.x, endpoint.y - last.y) > .0007) this.activeStroke.points.push(endpoint);
+      }
       this.activeStroke = null; this.pointer = null; this.changed();
     }
     changed() {
@@ -215,6 +220,10 @@
       this.innerHTML = `<div class="answer-workspace"><div class="answer-steps"><span>① 手写答案</span><span>② 提交批改</span><span>③ 记录错因</span></div><handwriting-pad title="本题答题纸" pad-id="${this.id}-draft"></handwriting-pad><div class="submission-bar"><span class="submission-note">笔迹保存在本机；提交时仅发送本题图片进行云端批改。</span><button class="primary" data-submit>提交批改</button></div><div class="grade-result hidden" role="status" aria-live="polite"><strong class="grade-title"></strong><dl><div><dt>识别到的答案</dt><dd data-recognized></dd></div><div><dt>参考答案</dt><dd data-expected></dd></div></dl><p data-explanation></p><div class="error-reasons hidden"><p>我这次错在哪里？可多选</p><div class="reason-options"></div></div><div class="grade-actions"><button class="secondary" data-retry>重新作答</button><button class="text-button" data-dispute>识别有误，重新核实</button><button class="primary" data-next>保存并下一题</button></div></div><p class="submission-error hidden" role="alert"></p><details class="answer-history"><summary>答题记录 <span class="history-count">0</span></summary><div class="history-list"></div></details></div>`;
       this.pad = this.querySelector('handwriting-pad');
       this.querySelector('.submission-note').textContent = '免费本机识别，不上传笔迹。首次提交需要加载模型，请稍等。';
+      const skipButton = document.createElement('button');
+      skipButton.className = 'secondary'; skipButton.dataset.skip = ''; skipButton.textContent = '暂存并跳过';
+      skipButton.onclick = () => this.skip();
+      this.querySelector('.grade-actions').append(skipButton);
       this.submitButton = this.querySelector('[data-submit]');
       this.submitButton.onclick = () => this.submit();
       this.querySelector('[data-next]').onclick = () => this.advance();
@@ -228,19 +237,35 @@
         this.dispatchEvent(new CustomEvent('answer-invalidated', { bubbles: true }));
       };
       this.pad.addEventListener('inkchange', () => {
-        if (this.result || this.attempt) { this.result = null; this.attempt = null; this.querySelector('.grade-result').classList.add('hidden'); }
+        if (this.result || this.attempt) {
+          this.result = null; this.attempt = null; this.querySelector('.grade-result').classList.add('hidden');
+          this.dispatchEvent(new CustomEvent('answer-invalidated', { bubbles: true }));
+        }
         this.clearError();
       });
       this.historyVersion = 0;
       this.renderHistory();
     }
-    setQuestion(question) {
+    async setQuestion(question) {
       this.controller?.abort(); this.question = copy(question); this.generation = crypto.randomUUID();
       this.result = null; this.attempt = null; this.busy = false; this.setBusy(false);
       this.querySelector('.grade-result').classList.add('hidden'); this.clearError();
-      this.pad.setScope(`${question.module}:${question.id}`);
+      const generation = this.generation;
+      const draftLoaded = this.pad.setScope(`${question.module}:${question.id}`);
       this.pad.querySelector('.pad-title').textContent = question.title || '本题答题纸';
       this.renderHistory();
+      try {
+        await draftLoaded;
+        const entries = await notebook.export();
+        if (generation !== this.generation || this.pad.activeStroke) return;
+        const latest = entries.filter(([key, value]) => key.startsWith('attempt:') && value.question?.module === question.module && value.question.id === question.id)
+          .map(([, value]) => value).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+        if (!latest || latest.counted || JSON.stringify(latest.strokes) !== JSON.stringify(this.pad.strokes)) return;
+        latest.inkRevision = this.pad.revision;
+        this.attempt = latest; this.result = latest.disputed ? null : latest;
+        this.renderResult(latest);
+        if (!latest.disputed) this.dispatchEvent(new CustomEvent('answer-graded', { bubbles: true, detail: { question, status: latest.status } }));
+      } catch (error) { if (generation === this.generation) this.error(error.message); }
     }
     clearError() { this.querySelector('.submission-error').classList.add('hidden'); }
     error(message) { const el = this.querySelector('.submission-error'); el.textContent = message; el.classList.remove('hidden'); }
@@ -285,13 +310,14 @@
     }
     renderResult(attempt) {
       const root = this.querySelector('.grade-result'); root.className = `grade-result ${attempt.status}`;
-      root.querySelector('.grade-title').textContent = { correct: '✓ 本题答对了', wrong: '本题需要复习', uncertain: '笔迹需要核实 · 暂不计对错' }[attempt.status];
+      root.querySelector('.grade-title').textContent = { correct: '✓ 本题答对了', wrong: '本题需要复习', uncertain: '待核实 · 暂不计对错' }[attempt.status];
       root.querySelector('[data-recognized]').textContent = attempt.recognized || '未能清楚辨认';
       root.querySelector('[data-expected]').textContent = attempt.expected;
       root.querySelector('[data-explanation]').textContent = attempt.disputed ? '您已标记识别有误，本题不会记为答错。请重新作答后提交核实。' : attempt.explanation;
       root.querySelector('.error-reasons').classList.toggle('hidden', attempt.status !== 'wrong');
       root.querySelector('[data-dispute]').classList.toggle('hidden', attempt.status === 'uncertain');
       root.querySelector('[data-next]').disabled = attempt.status === 'uncertain';
+      root.querySelector('[data-skip]').classList.toggle('hidden', attempt.status !== 'uncertain');
       const options = root.querySelector('.reason-options'); options.replaceChildren();
       for (const reason of ['没记住意思', '意思混淆', '拼写错误', '听音没听清', '粗心漏写', '其他原因']) {
         const label = document.createElement('label'), input = document.createElement('input');
@@ -313,6 +339,16 @@
         await notebook.put(`draft:${this.attempt.question.module}:${this.attempt.question.id}`, []);
         this.dispatchEvent(new CustomEvent('answer-completed', { bubbles: true, detail: copy(this.attempt) }));
       } catch (error) { this.attempt.counted = false; this.error(error.message); }
+      finally { this.setBusy(false); }
+    }
+    async skip() {
+      if (!this.attempt || this.attempt.status !== 'uncertain' || this.busy) return;
+      this.setBusy(true);
+      try {
+        this.attempt.skipped = true;
+        await notebook.put(`attempt:${this.attempt.id}`, this.attempt);
+        this.dispatchEvent(new CustomEvent('answer-skipped', { bubbles: true, detail: copy(this.attempt) }));
+      } catch (error) { this.error(error.message); }
       finally { this.setBusy(false); }
     }
     retry() {

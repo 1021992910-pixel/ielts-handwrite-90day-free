@@ -8,16 +8,18 @@ catch { playwright = require('C:/Users/10219/.cache/codex-runtimes/codex-primary
 const browser = await playwright.chromium.launch({ channel: 'msedge', headless: true });
 const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1180, height: 820 } });
 const page = await context.newPage(), external = [], posts = [], errors = [];
+const testURL = process.env.FREE_OCR_TEST_URL || 'http://127.0.0.1:4183/';
+const allowedOrigin = new URL(testURL).origin;
 page.on('pageerror', error => { errors.push(error.message); console.log('PAGE ERROR:', error.message); });
 page.on('console', message => { if (['error', 'warning'].includes(message.type())) console.log('BROWSER:', message.text()); });
 page.on('request', request => { if (request.method() === 'POST') posts.push(request.url()); });
 await context.route('**/*', route => {
   const url = new URL(route.request().url());
-  if (!['127.0.0.1', 'localhost'].includes(url.hostname)) { external.push(url.origin); return route.abort(); }
+  if (url.origin !== allowedOrigin) { external.push(url.origin); return route.abort(); }
   return route.continue();
 });
 try {
-  await page.goto('http://127.0.0.1:4183/');
+  await page.goto(testURL);
   const result = await page.evaluate(async () => {
     const reports = [];
     for (const [text, kind, prompt, expected] of [

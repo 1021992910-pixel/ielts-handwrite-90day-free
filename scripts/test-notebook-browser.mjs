@@ -42,6 +42,15 @@ try {
   await workspace().locator('[data-submit]').click();
   assert.match(await workspace().locator('.submission-error').innerText(), /先.*写/); assert.equal(calls, 0);
   await ink();
+  const fallback = await page.evaluate(() => {
+    const pad = document.querySelector('#wordWorkspace').pad, rect = pad.canvas.getBoundingClientRect();
+    const stroke = pad.strokes.at(-1), before = stroke.points.length;
+    pad.activeStroke = stroke; pad.pointer = 99;
+    pad.move({ pointerId: 99, clientX: rect.left + 190, clientY: rect.top + 150, pressure: .5, preventDefault() {}, getCoalescedEvents() { return []; } });
+    pad.up({ pointerId: 99, type: 'pointerup', clientX: rect.left + 210, clientY: rect.top + 160, pressure: .5 });
+    return { before, after: stroke.points.length };
+  });
+  assert.equal(fallback.after, fallback.before + 2, 'Empty coalesced events and the final pen-up point must not drop ink');
   const strokeCount = await page.evaluate(() => document.querySelector('#wordWorkspace').pad.strokes.length);
   await workspace().locator('[data-action=clear]').click();
   assert.equal(await page.evaluate(() => document.querySelector('#wordWorkspace').pad.hasInk), false);
@@ -62,6 +71,10 @@ try {
   await workspace().locator('[data-next]').click();
   assert.match(await workspace().locator('.submission-error').innerText(), /选择.*错因/);
   await workspace().getByLabel('意思混淆', { exact: true }).check();
+  await page.waitForFunction(async () => (await window.HandwritingNotebook.export()).some(([key, value]) => key.startsWith('attempt:') && value.reasons?.includes('意思混淆')));
+  await page.reload(); await page.locator('[data-view=words]').click(); await settled();
+  await workspace().locator('.grade-result.wrong').waitFor();
+  assert.equal(await workspace().getByLabel('意思混淆', { exact: true }).isChecked(), true, 'Restore the uncompleted grading and chosen reason after reload');
   await page.screenshot({ path: new URL('02-grading-and-reasons.png', output).pathname.replace(/^\/(\w:)/, '$1'), fullPage: true });
   await workspace().locator('[data-next]').click(); await page.waitForFunction(() => state.wordReviewed === 2); await settled();
   assert.equal(await page.evaluate(() => state.wordReviewed), 2);
@@ -74,7 +87,11 @@ try {
   await workspace().locator('.grade-result.uncertain').waitFor();
   assert.equal(await workspace().locator('[data-next]').isDisabled(), true);
   assert.equal(await page.evaluate(() => state.wordReviewed), 2);
-  await workspace().locator('[data-retry]').click(); await ink(); mode = 'unavailable';
+  const uncertainQuestion = await page.evaluate(() => document.querySelector('#wordWorkspace').question.id);
+  await workspace().locator('[data-skip]').click();
+  await page.waitForFunction(previous => document.querySelector('#wordWorkspace').question.id !== previous, uncertainQuestion);
+  assert.equal(await page.evaluate(() => state.wordReviewed), 2, 'Skipping an uncertain answer does not count as correct or wrong');
+  await ink(); mode = 'unavailable';
   await workspace().locator('[data-submit]').click();
   await workspace().locator('.submission-error').waitFor();
   assert.equal(await page.evaluate(() => document.querySelector('#wordWorkspace').pad.hasInk), true);
@@ -95,5 +112,5 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
   assert.deepEqual(errors, []);
-  console.log('Browser checks passed: pen canvas, recoverable clear, reload persistence, independent questions, automatic result flow, error reasons, history, uncertain/unavailable states, portrait and small screens. Cloud responses were mocked; physical Apple Pencil and live recognition remain unverified.');
+  console.log('Browser checks passed: pen events, undoable clear, restored grading and error reasons, independent answers, history, unscored skip, offline errors, portrait and small screens. OCR responses were mocked here; real local engine fixtures have a separate test. Physical Apple Pencil remains unverified.');
 } finally { await browser.close(); }
