@@ -181,6 +181,13 @@ answer-workspace { display: block; min-width: 0; }
 .submission-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .submission-note { color: #738095; font-size: .8rem; line-height: 1.6; max-width: 44ch; }
 .submission-bar button { flex-shrink: 0; min-width: 145px; }
+.submission-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.submission-actions button { min-width: 110px; }
+.ocr-progress { display: grid; gap: 10px; padding: 15px 18px; border: 1px solid #b8d0e6; border-radius: 12px; background: #f1f7fc; color: #234467; }
+.ocr-progress strong { font-size: .93rem; line-height: 1.7; overflow-wrap: anywhere; }
+.ocr-progress progress { width: 100%; height: 12px; accent-color: #254a76; }
+.ocr-progress small { color: #5d7187; line-height: 1.6; }
+.recovery-actions:has(.hidden) { display: none; }
 button:disabled { opacity: .55; cursor: not-allowed; }
 .grade-result { padding: 20px; border: 1px solid #b5d8c8; border-radius: 18px; background: #f0faf5; }
 .grade-result.wrong { background: #fff8ed; border-color: #eacb94; }

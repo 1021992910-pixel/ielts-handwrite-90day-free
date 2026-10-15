@@ -49,6 +49,17 @@
   window.HandwritingNotebook = notebook;
   function notice(text) { if (typeof toast === 'function') toast(text); }
   const copy = value => JSON.parse(JSON.stringify(value));
+  function waitFor(promise, signal, timeoutMs, message) {
+    return new Promise((resolve, reject) => {
+      let timer;
+      const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', cancel); };
+      const cancel = () => { cleanup(); reject(new DOMException('Aborted', 'AbortError')); };
+      if (signal?.aborted) { cancel(); return; }
+      signal?.addEventListener('abort', cancel, { once: true });
+      if (timeoutMs) timer = setTimeout(() => { cleanup(); reject(new Error(message)); }, timeoutMs);
+      Promise.resolve(promise).then(value => { cleanup(); resolve(value); }, error => { cleanup(); reject(error); });
+    });
+  }
 
   class HandwritingPad extends HTMLElement {
     connectedCallback() {
@@ -219,7 +230,23 @@
       if (this.pad) return;
       this.innerHTML = `<div class="answer-workspace"><div class="answer-steps"><span>① 手写答案</span><span>② 提交批改</span><span>③ 记录错因</span></div><handwriting-pad title="本题答题纸" pad-id="${this.id}-draft"></handwriting-pad><div class="submission-bar"><span class="submission-note">笔迹保存在本机；提交时仅发送本题图片进行云端批改。</span><button class="primary" data-submit>提交批改</button></div><div class="grade-result hidden" role="status" aria-live="polite"><strong class="grade-title"></strong><dl><div><dt>识别到的答案</dt><dd data-recognized></dd></div><div><dt>参考答案</dt><dd data-expected></dd></div></dl><p data-explanation></p><div class="error-reasons hidden"><p>我这次错在哪里？可多选</p><div class="reason-options"></div></div><div class="grade-actions"><button class="secondary" data-retry>重新作答</button><button class="text-button" data-dispute>识别有误，重新核实</button><button class="primary" data-next>保存并下一题</button></div></div><p class="submission-error hidden" role="alert"></p><details class="answer-history"><summary>答题记录 <span class="history-count">0</span></summary><div class="history-list"></div></details></div>`;
       this.pad = this.querySelector('handwriting-pad');
-      this.querySelector('.submission-note').textContent = '免费本机识别，不上传笔迹。首次提交需要加载模型，请稍等。';
+      this.querySelector('.submission-note').textContent = '免费本机识别，不上传笔迹。首次需下载约46MB组件，会显示进度；可随时取消。';
+      this.querySelector('.submission-bar').insertAdjacentHTML('afterend', '<div class="ocr-progress hidden" role="status" aria-live="polite"><strong data-progress-message></strong><progress max="100" aria-label="免费识别组件下载进度"></progress><small data-elapsed></small></div>');
+      this.progressPanel = this.querySelector('.ocr-progress');
+      this.progressMessage = this.querySelector('[data-progress-message]');
+      this.progressBar = this.progressPanel.querySelector('progress');
+      const submitActions = document.createElement('div'); submitActions.className = 'submission-actions';
+      this.querySelector('.submission-bar').append(submitActions);
+      submitActions.append(this.querySelector('[data-submit]'));
+      this.cancelButton = document.createElement('button');
+      this.cancelButton.className = 'secondary hidden'; this.cancelButton.dataset.cancel = ''; this.cancelButton.textContent = '取消等待';
+      this.cancelButton.onclick = () => { this.cancelledByUser = true; this.controller?.abort(); };
+      submitActions.append(this.cancelButton);
+      const recovery = document.createElement('div'); recovery.className = 'recovery-actions';
+      recovery.innerHTML = '<button class="secondary hidden" data-retry-submit>重试批改（保留笔迹）</button>';
+      this.querySelector('.submission-error').after(recovery);
+      this.retrySubmitButton = recovery.querySelector('button');
+      this.retrySubmitButton.onclick = () => this.submit();
       const skipButton = document.createElement('button');
       skipButton.className = 'secondary'; skipButton.dataset.skip = ''; skipButton.textContent = '暂存并跳过';
       skipButton.onclick = () => this.skip();
@@ -267,11 +294,28 @@
         if (!latest.disputed) this.dispatchEvent(new CustomEvent('answer-graded', { bubbles: true, detail: { question, status: latest.status } }));
       } catch (error) { if (generation === this.generation) this.error(error.message); }
     }
-    clearError() { this.querySelector('.submission-error').classList.add('hidden'); }
-    error(message) { const el = this.querySelector('.submission-error'); el.textContent = message; el.classList.remove('hidden'); }
+    clearError() { this.querySelector('.submission-error').classList.add('hidden'); this.retrySubmitButton.classList.add('hidden'); }
+    error(message) {
+      const el = this.querySelector('.submission-error'); el.textContent = message; el.classList.remove('hidden');
+      this.retrySubmitButton.classList.toggle('hidden', this.busy || !this.pad.hasInk);
+    }
+    updateProgress(message, details = {}) {
+      const firstStage = this.progressPanel.classList.contains('hidden');
+      this.progressPanel.classList.remove('hidden'); this.progressMessage.textContent = message;
+      if (Number.isFinite(details.percent)) this.progressBar.value = details.percent;
+      else this.progressBar.removeAttribute('value');
+      this.submitButton.textContent = details.stage === 'recognize' ? '正在批改…' : details.stage === 'save' ? '正在保存…' : '正在准备识别…';
+      if (firstStage) this.progressPanel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
     setBusy(busy) {
       this.busy = busy; this.pad.locked = busy; this.submitButton.disabled = busy;
-      this.submitButton.textContent = busy ? '正在识别与批改…' : '提交批改';
+      this.submitButton.textContent = busy ? '正在处理…' : '提交批改';
+      this.cancelButton.classList.toggle('hidden', !busy || !this.controller);
+      if (!busy) {
+        clearInterval(this.elapsedTimer); this.elapsedTimer = null;
+        this.progressPanel.classList.add('hidden');
+        this.retrySubmitButton.classList.toggle('hidden', this.querySelector('.submission-error').classList.contains('hidden') || !this.pad.hasInk);
+      }
       this.setAttribute('aria-busy', String(busy));
     }
     async submit() {
@@ -280,10 +324,14 @@
       if (!this.pad.hasInk) { this.error('请先在答题纸上写出答案，再提交。'); return; }
       if (this.result && this.attempt && this.attempt.inkRevision === this.pad.revision) { this.error('这份答案已经批改，可记录错因后进入下一题，或重写再提交。'); return; }
       const generation = this.generation, question = copy(this.question), strokes = copy(this.pad.strokes), inkRevision = this.pad.revision;
-      this.clearError(); this.setBusy(true); this.controller = new AbortController();
-      const timeout = setTimeout(() => this.controller?.abort(), 190000);
+      this.clearError(); this.controller = new AbortController(); this.cancelledByUser = false; this.setBusy(true);
+      const controller = this.controller, started = Date.now();
+      const timeout = setTimeout(() => controller.abort(), 310000);
+      this.updateProgress('正在确认本题笔迹已保存…', { stage: 'save' });
+      const elapsed = () => { this.querySelector('[data-elapsed]').textContent = `已等待 ${Math.floor((Date.now() - started) / 1000)} 秒 · 可以取消，笔迹不会清除`; };
+      elapsed(); this.elapsedTimer = setInterval(elapsed, 1000);
       try {
-        await this.pad.savePromise;
+        await waitFor(this.pad.savePromise, controller.signal, 8000, '笔迹保存超过8秒没有完成。请先导出图片，再重试；本题尚未计分。');
         const answerImage = this.pad.imageCanvas(1200, strokes);
         const pixels = this.pad.imageCanvas(800, strokes).getContext('2d');
         const rgba = pixels.getImageData(0, 0, pixels.canvas.width, pixels.canvas.height).data;
@@ -291,21 +339,24 @@
         for (let i = 0; i < rgba.length; i += 4) if (rgba[i] < 235 || rgba[i + 1] < 235 || rgba[i + 2] < 235) { hasVisibleInk = true; break; }
         if (!hasVisibleInk) throw new Error('答题纸目前是空白的，请写出答案再提交。');
         if (!window.FreeHandwritingGrader) throw new Error('免费识别组件尚未加载，请刷新页面后重试。');
-        const data = await window.FreeHandwritingGrader.grade(question, answerImage, {
-          signal: this.controller.signal,
-          onProgress: message => { if (generation === this.generation) this.submitButton.textContent = message; }
-        });
+        const data = await waitFor(window.FreeHandwritingGrader.grade(question, answerImage, {
+          signal: controller.signal,
+          onProgress: (message, details) => { if (generation === this.generation && this.controller === controller && !controller.signal.aborted) this.updateProgress(message, details); }
+        }), controller.signal);
         if (!['correct', 'wrong', 'uncertain'].includes(data.status) || typeof data.recognized !== 'string' || typeof data.explanation !== 'string') throw new Error('批改结果不完整，请重新提交；本题尚未计分。');
         if (generation !== this.generation) return;
         const attempt = { id: crypto.randomUUID(), question, strokes, status: data.status, recognized: data.recognized, explanation: data.explanation, expected: question.expected.join('；'), reasons: [], createdAt: new Date().toISOString(), inkRevision, counted: false };
-        await notebook.put(`attempt:${attempt.id}`, attempt);
+        this.updateProgress('已完成识别，正在保存本题结果…', { stage: 'save' });
+        await waitFor(notebook.put(`attempt:${attempt.id}`, attempt), controller.signal, 10000, '批改结果保存未完成，请先导出笔迹再重试；本题尚未计分。');
         if (generation !== this.generation) return;
         this.attempt = attempt; this.result = data; this.renderResult(attempt); this.renderHistory();
         this.dispatchEvent(new CustomEvent('answer-graded', { bubbles: true, detail: { question, status: data.status } }));
       } catch (error) {
-        if (generation === this.generation) this.error(error.name === 'AbortError' ? '识别等待超时，答案已保存，请稍后重试。' : error.message);
+        if (generation === this.generation) this.error(error.name === 'AbortError' ? this.cancelledByUser ? '已取消本次等待。笔迹未清除，您可以点“重试批改”。' : '识别等待超时，已停止本次处理。笔迹未清除，本题尚未计分。' : error.message);
       } finally {
-        clearTimeout(timeout); if (generation === this.generation) this.setBusy(false);
+        clearTimeout(timeout);
+        if (this.controller === controller) this.controller = null;
+        if (generation === this.generation) this.setBusy(false);
       }
     }
     renderResult(attempt) {

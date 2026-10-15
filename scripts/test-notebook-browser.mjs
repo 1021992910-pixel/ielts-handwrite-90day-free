@@ -5,8 +5,9 @@ const require = createRequire(import.meta.url);
 let playwright;
 try { playwright = require('playwright'); }
 catch { playwright = require('C:/Users/10219/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'); }
-const browser = await playwright.chromium.launch({ headless: true, channel: 'msedge' });
-const context = await browser.newContext({ viewport: { width: 1180, height: 820 }, serviceWorkers: 'block', acceptDownloads: true });
+const browserName = process.env.NOTEBOOK_BROWSER || 'chromium';
+const browser = await playwright[browserName].launch({ headless: true, ...(browserName === 'chromium' ? { channel: 'msedge' } : {}) });
+const context = await browser.newContext({ viewport: { width: 1180, height: 820 }, serviceWorkers: 'block', acceptDownloads: true, ...(browserName === 'webkit' ? { isMobile: true, hasTouch: true } : {}) });
 const page = await context.newPage(), errors = [];
 page.on('pageerror', error => errors.push(error.message));
 const url = process.env.NOTEBOOK_TEST_URL || 'http://127.0.0.1:4183/';
@@ -21,7 +22,13 @@ await page.exposeFunction('__testFreeGrade', async (question, dimensions) => {
   return { status: mode, recognized: mode === 'wrong' ? '错误意思' : '不同', explanation: mode === 'correct' ? '意思正确，接受合理中文表达。' : mode === 'uncertain' ? '有些笔迹未能辨认，暂不计对错。' : '这个意思与参考词义不符。' };
 });
 await context.addInitScript(() => {
-  const stub = { grade: (question, canvas) => window.__testFreeGrade(question, { width: canvas.width, height: canvas.height }) };
+  const stub = { grade: (question, canvas, options) => {
+    if (window.__hangOCR) {
+      options.onProgress('准备免费识别 25% · 测试慢速下载', { stage: 'download', percent: 25 });
+      return new Promise(() => {});
+    }
+    return window.__testFreeGrade(question, { width: canvas.width, height: canvas.height });
+  } };
   Object.defineProperty(window, 'FreeHandwritingGrader', { configurable: true, get: () => stub, set: () => {} });
 });
 const workspace = () => page.locator('#wordWorkspace');
@@ -100,8 +107,33 @@ try {
   assert.equal(records.filter(([key]) => key.startsWith('attempt:')).length, 3);
   // Real pen pointer semantics: touch is ignored by default; a pen is accepted.
   const before = await page.evaluate(() => document.querySelector('#wordWorkspace').pad.strokes.length);
-  await workspace().locator('canvas').dispatchEvent('pointerdown', { pointerId: 9, pointerType: 'touch', clientX: 40, clientY: 40, button: 0 });
+  await page.evaluate(() => window.__hangOCR = true);
+  await workspace().locator('[data-submit]').click();
+  await workspace().locator('.ocr-progress:not(.hidden)').waitFor();
+  assert.match(await workspace().locator('[data-progress-message]').innerText(), /25%/);
+  assert.equal(await workspace().locator('progress').getAttribute('value'), '25');
+  await page.screenshot({ path: new URL('04-download-progress.png', output).pathname.replace(/^\/(\w:)/, '$1'), fullPage: true });
+  await workspace().locator('[data-cancel]').click();
+  await page.waitForFunction(() => !document.querySelector('#wordWorkspace').busy);
+  assert.match(await workspace().locator('.submission-error').innerText(), /已取消/);
   assert.equal(await page.evaluate(() => document.querySelector('#wordWorkspace').pad.strokes.length), before);
+  assert.equal(await page.evaluate(() => state.wordReviewed), 2);
+  await page.evaluate(() => window.__hangOCR = false); mode = 'correct';
+  await workspace().locator('[data-retry-submit]').click();
+  await workspace().locator('.grade-result.correct').waitFor();
+  // Cancellation must also work before recognition, while an IndexedDB write is stalled.
+  await ink();
+  await page.evaluate(() => { window.__savedInkPromise = document.querySelector('#wordWorkspace').pad.savePromise; document.querySelector('#wordWorkspace').pad.savePromise = new Promise(() => {}); });
+  await workspace().locator('[data-submit]').click();
+  await page.waitForFunction(() => document.querySelector('#wordWorkspace [data-progress-message]').textContent.includes('确认本题笔迹'));
+  await workspace().locator('[data-cancel]').click();
+  await page.waitForFunction(() => !document.querySelector('#wordWorkspace').busy);
+  await page.evaluate(() => document.querySelector('#wordWorkspace').pad.savePromise = window.__savedInkPromise);
+  await workspace().locator('[data-retry-submit]').click();
+  await workspace().locator('.grade-result.correct').waitFor();
+  const beforeTouch = await page.evaluate(() => document.querySelector('#wordWorkspace').pad.strokes.length);
+  await workspace().locator('canvas').dispatchEvent('pointerdown', { pointerId: 9, pointerType: 'touch', clientX: 40, clientY: 40, button: 0 });
+  assert.equal(await page.evaluate(() => document.querySelector('#wordWorkspace').pad.strokes.length), beforeTouch);
   await page.setViewportSize({ width: 820, height: 1180 });
   await page.screenshot({ path: new URL('03-ipad-portrait.png', output).pathname.replace(/^\/(\w:)/, '$1'), fullPage: true });
   const portraitOverflow = await page.evaluate(() => [...document.querySelectorAll('body *')].filter(el => el.getBoundingClientRect().right > innerWidth + 1 && getComputedStyle(el).position !== 'absolute').map(el => ({ tag: el.tagName, class: el.className, right: el.getBoundingClientRect().right })));
@@ -112,5 +144,5 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
   assert.deepEqual(errors, []);
-  console.log('Browser checks passed: pen events, undoable clear, restored grading and error reasons, independent answers, history, unscored skip, offline errors, portrait and small screens. OCR responses were mocked here; real local engine fixtures have a separate test. Physical Apple Pencil remains unverified.');
+  console.log(`Browser ${browserName} checks passed: pen events, saved history, progress UI, cancellation during OCR and stalled storage, retry without rewriting, unscored failures, portrait and small screens. OCR mocked here; real engine has a separate test. Physical Apple Pencil remains unverified.`);
 } finally { await browser.close(); }

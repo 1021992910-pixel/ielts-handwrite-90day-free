@@ -6,7 +6,7 @@ const handlers = {}, deleted = [];
 const context = vm.createContext({
   self: { location: { origin: 'https://study.test' }, addEventListener: (name, action) => handlers[name] = action, clients: { claim() {} } },
   caches: {
-    keys: async () => ['ielts-handwrite-free-v4', 'ielts-handwrite-local-ocr-v7', 'other-study-app'],
+    keys: async () => ['ielts-handwrite-free-v4', 'ielts-handwrite-local-ocr-v8', 'other-study-app', 'ielts-ocr-models-v1'],
     delete: async key => deleted.push(key),
     match: async () => undefined
   },
@@ -17,6 +17,9 @@ let operation;
 handlers.activate({ waitUntil: promise => operation = promise }); await operation;
 assert.deepEqual(deleted, ['ielts-handwrite-free-v4'], 'Do not clear another app cache on the same GitHub Pages origin');
 let response;
-handlers.fetch({ request: new Request('https://study.test/models/recognizer.tar'), respondWith: promise => response = promise });
+handlers.fetch({ request: new Request('https://study.test/missing.js'), respondWith: promise => response = promise });
 assert.equal((await response).type, 'error', 'An unavailable model must not receive HTML as if it were a model');
+let intercepted = false;
+handlers.fetch({ request: new Request('https://study.test/models/recognizer.tar'), respondWith: () => intercepted = true });
+assert.equal(intercepted, false, 'Model downloads belong to the resumable loader, not a duplicate service-worker cache');
 console.log('Cache checks passed: preserve other apps and fail missing model requests explicitly.');
