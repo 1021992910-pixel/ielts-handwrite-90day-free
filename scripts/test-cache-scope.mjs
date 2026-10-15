@@ -6,7 +6,7 @@ const handlers = {}, deleted = [];
 const context = vm.createContext({
   self: { location: { origin: 'https://study.test' }, addEventListener: (name, action) => handlers[name] = action, clients: { claim() {} } },
   caches: {
-    keys: async () => ['ielts-handwrite-free-v4', 'ielts-handwrite-local-ocr-v8', 'other-study-app', 'ielts-ocr-models-v1'],
+    keys: async () => ['ielts-handwrite-free-v4', 'ielts-handwrite-local-ocr-v9', 'other-study-app', 'ielts-ocr-models-v1'],
     delete: async key => deleted.push(key),
     match: async () => undefined
   },

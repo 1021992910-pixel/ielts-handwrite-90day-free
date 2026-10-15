@@ -12,6 +12,7 @@ const assetSpecs = [
   ["/free-grader.js", "free-grader.js", "text/javascript; charset=utf-8"],
   ["/free-ocr-worker.js", "free-ocr-worker.js", "text/javascript; charset=utf-8"],
   ["/free-ocr-assets.js", "free-ocr-assets.js", "text/javascript; charset=utf-8"],
+  ["/ocr-assets-manifest.js", "ocr-assets-manifest.js", "text/javascript; charset=utf-8"],
   ["/app.js", "app.js", "text/javascript; charset=utf-8"],
   ["/manifest.webmanifest", "manifest.webmanifest", "application/manifest+json; charset=utf-8"],
   ["/sw.js", "sw.js", "text/javascript; charset=utf-8"]

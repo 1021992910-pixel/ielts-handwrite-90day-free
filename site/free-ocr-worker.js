@@ -9,6 +9,10 @@ async function initialize(progress) {
     progress({ stage: 'initialize', message: '组件已准备好，正在初始化本机模型…' });
     try {
       // Reuse downloaded bytes even on a first visit without a controlling Service Worker.
+      const cvSource = await blobs.cv.text();
+      const cvURL = URL.createObjectURL(new Blob(['const module = { exports: {} }; const exports = module.exports;\n', cvSource, '\nexport default module.exports;'], { type: 'text/javascript' }));
+      urls.cvModule = cvURL;
+      globalThis.__ieltsCVModule = (await import(cvURL)).default;
       const { PaddleOCR } = await import(urls.sdk);
       const ocr = await PaddleOCR.create({
         lang: 'ch', ocrVersion: 'PP-OCRv5', worker: false,

@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <meta name="theme-color" content="#152b4f">
+  <meta name="theme-color" content="#234e4a">
+  <meta name="app-version" content="student-20261015-a">
   <meta name="description" content="为平板手写设计的三个月雅思学习台">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23152b4f'/%3E%3Cpath d='M17 45l7-19 6 14 7-25 10 30' fill='none' stroke='%23f0b75b' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
@@ -14,14 +15,14 @@
   <div class="app-shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">IELTS · 90 DAY PATH · 识别等待修复版 10.15</p>
+        <p class="eyebrow">IELTS · YOUR DAILY STUDY SPACE</p>
         <h1>90天雅思手写学习台</h1>
       </div>
       <div class="goal-chip">
         <span>总分 6.5</span>
         <span>口语 6+</span>
         <span>听/读一项冲高</span>
-        <span class="privacy-chip">免费本机识别 · 不上传笔迹</span>
+        <span class="privacy-chip">手写练习 · 自动保存</span>
       </div>
     </header>
 
@@ -285,9 +286,9 @@
               <label class="file-button">导入备份<input type="file" id="importData" accept=".json,application/json"></label>
             </div>
             <details class="review-connection">
-              <summary>免费手写批改怎么用</summary>
-              <p>进入“单词”，先切到“中 → 英”，在答题纸上写一个英文单词，点“提交批改”。首次使用需要加载免费模型，请保持页面打开。</p>
-              <p class="muted">模型在本机识别，不上传笔迹、不扣 Token、不需要密钥。英文拼写自动核对；中文释义按已收录的同义表达核对，未收录的表达暂不计对错。首次使用前请先导出原有学习记录。</p>
+              <summary>书写与批改说明</summary>
+              <p>在答题纸上手写答案，点“提交批改”，查看识别文字与参考答案，再记录需要复习的地方。首次准备可能稍久，后续会复用已准备好的组件。</p>
+              <p class="muted">答案在当前设备上识别，不上传笔迹。批改可能存在误差，请核对识别文字；无法可靠判断的答案不会直接记错。学习记录保存在当前浏览器，请定期导出备份。</p>
             </details>
           </article>
           <article class="panel">
@@ -297,6 +298,8 @@
         </div>
       </section>
     </main>
+
+    <footer class="study-footer"><span>每天一点积累，让进步看得见。</span><small>学员版 · 10.15A</small></footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>

@@ -1,5 +1,5 @@
-const CACHE = "ielts-handwrite-local-ocr-v8";
-const FILES = ["./", "./index.html", "./styles.css", "./spelling-data.js", "./local-grader.js", "./handwriting.js", "./free-grader.js", "./free-ocr-worker.js", "./free-ocr-assets.js", "./app.js", "./manifest.webmanifest"];
+const CACHE = "ielts-handwrite-local-ocr-v9";
+const FILES = ["./", "./index.html", "./styles.css", "./spelling-data.js", "./local-grader.js", "./handwriting.js", "./free-grader.js", "./free-ocr-worker.js", "./free-ocr-assets.js", "./ocr-assets-manifest.js", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)));

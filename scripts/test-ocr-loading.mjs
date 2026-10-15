@@ -2,8 +2,13 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFile, stat } from 'node:fs/promises';
 import { ASSETS, loadOCRAssets } from '../site/free-ocr-assets.js';
+import { createHash } from 'node:crypto';
 
-for (const asset of ASSETS) assert.equal((await stat(new URL(`../site/${asset.path}`, import.meta.url))).size, asset.bytes, asset.path);
+for (const asset of ASSETS) {
+  const file = new URL(`../site/${asset.path}`, import.meta.url);
+  assert.equal((await stat(file)).size, asset.bytes, asset.path);
+  assert.equal(createHash('sha256').update(await readFile(file)).digest('hex'), asset.sha256);
+}
 const asset = { key: 'test', label: '测试组件', path: './test.bin', bytes: 4, type: 'application/octet-stream' };
 const records = new Map();
 const storage = {
@@ -34,6 +39,9 @@ await assert.rejects(loadOCRAssets({ assets: [asset], storage: undefined, stallM
 const abort = new AbortController();
 const cancelled = loadOCRAssets({ assets: [asset], storage: undefined, signal: abort.signal, fetchImpl: hangingFetch });
 setTimeout(() => abort.abort(), 10); await assert.rejects(cancelled, { name: 'AbortError' });
+const tried = [], checked = { ...asset, sha256: createHash('sha256').update(new Uint8Array([1, 2, 3, 4])).digest('hex'), sources: ['https://cdn.test/model.bin', asset.path] };
+await loadOCRAssets({ assets: [checked], storage: undefined, fetchImpl: async url => { tried.push(url); return new Response(new Uint8Array(url.startsWith('https:') ? [4, 3, 2, 1] : [1, 2, 3, 4])); } });
+assert.equal(tried.length, 2, 'A same-size but wrong-hash CDN file must fall back rather than execute');
 
 // Exercise the real main-thread lifecycle without waiting actual seconds for watchdogs.
 const workers = [], timers = new Map(); let timerID = 0;

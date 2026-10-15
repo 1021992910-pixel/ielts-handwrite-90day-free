@@ -63,6 +63,7 @@ try {
   assert.equal(await page.evaluate(() => document.querySelector('#wordWorkspace').pad.hasInk), false);
   await workspace().locator('[data-action=undo]').click();
   assert.equal(await page.evaluate(() => document.querySelector('#wordWorkspace').pad.strokes.length), strokeCount);
+  await page.evaluate(() => document.querySelector('#wordWorkspace').pad.savePromise);
   await page.reload(); await page.locator('[data-view=words]').click(); await settled();
   assert.equal(await page.locator('#wordPrompt').innerText(), 'different');
   assert.equal(await page.evaluate(() => document.querySelector('#wordWorkspace').pad.hasInk), true);
@@ -110,7 +111,10 @@ try {
   await page.evaluate(() => window.__hangOCR = true);
   await workspace().locator('[data-submit]').click();
   await workspace().locator('.ocr-progress:not(.hidden)').waitFor();
-  assert.match(await workspace().locator('[data-progress-message]').innerText(), /25%/);
+  assert.equal(await workspace().locator('[data-progress-message]').innerText(), '正在准备批改');
+  assert.match(await workspace().locator('[data-progress-technical]').textContent(), /25%/);
+  assert.equal(await workspace().locator('.processing-details').getAttribute('open'), null);
+  assert.doesNotMatch(await page.locator('body').innerText(), /免费|Token|46MB|模型|密钥/);
   assert.equal(await workspace().locator('progress').getAttribute('value'), '25');
   await page.screenshot({ path: new URL('04-download-progress.png', output).pathname.replace(/^\/(\w:)/, '$1'), fullPage: true });
   await workspace().locator('[data-cancel]').click();
@@ -125,7 +129,7 @@ try {
   await ink();
   await page.evaluate(() => { window.__savedInkPromise = document.querySelector('#wordWorkspace').pad.savePromise; document.querySelector('#wordWorkspace').pad.savePromise = new Promise(() => {}); });
   await workspace().locator('[data-submit]').click();
-  await page.waitForFunction(() => document.querySelector('#wordWorkspace [data-progress-message]').textContent.includes('确认本题笔迹'));
+  await page.waitForFunction(() => document.querySelector('#wordWorkspace [data-progress-message]').textContent.includes('正在保存答案'));
   await workspace().locator('[data-cancel]').click();
   await page.waitForFunction(() => !document.querySelector('#wordWorkspace').busy);
   await page.evaluate(() => document.querySelector('#wordWorkspace').pad.savePromise = window.__savedInkPromise);

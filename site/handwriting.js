@@ -230,8 +230,8 @@
       if (this.pad) return;
       this.innerHTML = `<div class="answer-workspace"><div class="answer-steps"><span>① 手写答案</span><span>② 提交批改</span><span>③ 记录错因</span></div><handwriting-pad title="本题答题纸" pad-id="${this.id}-draft"></handwriting-pad><div class="submission-bar"><span class="submission-note">笔迹保存在本机；提交时仅发送本题图片进行云端批改。</span><button class="primary" data-submit>提交批改</button></div><div class="grade-result hidden" role="status" aria-live="polite"><strong class="grade-title"></strong><dl><div><dt>识别到的答案</dt><dd data-recognized></dd></div><div><dt>参考答案</dt><dd data-expected></dd></div></dl><p data-explanation></p><div class="error-reasons hidden"><p>我这次错在哪里？可多选</p><div class="reason-options"></div></div><div class="grade-actions"><button class="secondary" data-retry>重新作答</button><button class="text-button" data-dispute>识别有误，重新核实</button><button class="primary" data-next>保存并下一题</button></div></div><p class="submission-error hidden" role="alert"></p><details class="answer-history"><summary>答题记录 <span class="history-count">0</span></summary><div class="history-list"></div></details></div>`;
       this.pad = this.querySelector('handwriting-pad');
-      this.querySelector('.submission-note').textContent = '免费本机识别，不上传笔迹。首次需下载约46MB组件，会显示进度；可随时取消。';
-      this.querySelector('.submission-bar').insertAdjacentHTML('afterend', '<div class="ocr-progress hidden" role="status" aria-live="polite"><strong data-progress-message></strong><progress max="100" aria-label="免费识别组件下载进度"></progress><small data-elapsed></small></div>');
+      this.querySelector('.submission-note').textContent = '写完即可提交；原笔迹会保留，方便回看与复习。';
+      this.querySelector('.submission-bar').insertAdjacentHTML('afterend', '<div class="ocr-progress hidden" role="status" aria-live="polite"><div class="processing-heading"><span class="loading-dot" aria-hidden="true"></span><div><strong data-progress-message></strong><span class="processing-hint">无需重复提交，您可以随时取消。</span></div></div><details class="processing-details"><summary>查看进度</summary><p data-progress-technical></p><progress max="100" aria-label="准备进度"></progress><small data-elapsed></small></details></div>');
       this.progressPanel = this.querySelector('.ocr-progress');
       this.progressMessage = this.querySelector('[data-progress-message]');
       this.progressBar = this.progressPanel.querySelector('progress');
@@ -296,12 +296,19 @@
     }
     clearError() { this.querySelector('.submission-error').classList.add('hidden'); this.retrySubmitButton.classList.add('hidden'); }
     error(message) {
-      const el = this.querySelector('.submission-error'); el.textContent = message; el.classList.remove('hidden');
+      this.lastDiagnostic = message;
+      const technical = /模型|组件|下载|WebAssembly|初始化|Safari|浏览器无法|浏览器不兼容|接口费用|识别等待超时/.test(message);
+      const el = this.querySelector('.submission-error');
+      el.textContent = technical ? '这次批改暂未完成，当前笔迹未清除。请重试，或先导出图片、稍后继续。' : message;
+      el.dataset.errorCode = /下载|连接/.test(message) ? 'NET' : /初始化|浏览器|WebAssembly/.test(message) ? 'DEVICE' : 'RETRY';
+      el.classList.remove('hidden');
       this.retrySubmitButton.classList.toggle('hidden', this.busy || !this.pad.hasInk);
     }
     updateProgress(message, details = {}) {
       const firstStage = this.progressPanel.classList.contains('hidden');
-      this.progressPanel.classList.remove('hidden'); this.progressMessage.textContent = message;
+      this.progressPanel.classList.remove('hidden');
+      this.progressMessage.textContent = ({ save: '正在保存答案', boot: '正在准备批改', download: '正在准备批改', initialize: '即将开始批改', recognize: '正在批改答案' })[details.stage] || '正在处理答案';
+      this.progressPanel.querySelector('[data-progress-technical]').textContent = message.replace(/免费/g, '');
       if (Number.isFinite(details.percent)) this.progressBar.value = details.percent;
       else this.progressBar.removeAttribute('value');
       this.submitButton.textContent = details.stage === 'recognize' ? '正在批改…' : details.stage === 'save' ? '正在保存…' : '正在准备识别…';
@@ -313,7 +320,7 @@
       this.cancelButton.classList.toggle('hidden', !busy || !this.controller);
       if (!busy) {
         clearInterval(this.elapsedTimer); this.elapsedTimer = null;
-        this.progressPanel.classList.add('hidden');
+        this.progressPanel.classList.add('hidden'); this.progressPanel.querySelector('details').open = false;
         this.retrySubmitButton.classList.toggle('hidden', this.querySelector('.submission-error').classList.contains('hidden') || !this.pad.hasInk);
       }
       this.setAttribute('aria-busy', String(busy));

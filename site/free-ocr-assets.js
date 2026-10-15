@@ -1,12 +1,13 @@
 // Report progress before importing the large SDK. This cache contains no user ink.
+import { ASSETS } from './ocr-assets-manifest.js';
+export { ASSETS };
 export const ASSET_CACHE = 'ielts-ocr-models-v1';
-export const ASSETS = [
-  { key: 'sdk', label: '识别组件', path: './vendor/paddleocr/ocr-sdk.js', bytes: 10561077, type: 'text/javascript' },
-  { key: 'det', label: '文字定位模型', path: './models/PP-OCRv5_mobile_det_onnx_infer.tar', bytes: 4843520, type: 'application/octet-stream' },
-  { key: 'rec', label: '中英文识别模型', path: './models/PP-OCRv5_mobile_rec_onnx_infer.tar', bytes: 16701440, type: 'application/octet-stream' },
-  { key: 'runtime', label: '运行组件', path: './vendor/paddleocr/ort/ort-wasm-simd-threaded.mjs', bytes: 24381, type: 'text/javascript' },
-  { key: 'wasm', label: '本机计算组件', path: './vendor/paddleocr/ort/ort-wasm-simd-threaded.wasm', bytes: 14239897, type: 'application/wasm' }
-];
+async function verified(blob, asset) {
+  if (blob.size !== asset.bytes) return false;
+  if (!asset.sha256) return true;
+  const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+  return [...new Uint8Array(digest)].map(n => n.toString(16).padStart(2, '0')).join('') === asset.sha256;
+}
 
 let modelDatabase;
 async function persistentModels() {
@@ -60,61 +61,74 @@ export async function loadOCRAssets({ onProgress = () => {}, signal, stallMs = 2
     lastNotice = Date.now();
     const loaded = [...sizes.values()].reduce((sum, n) => sum + n, 0);
     const percent = Math.min(100, Math.floor(loaded / total * 100));
-    onProgress({ stage: 'download', percent, loaded, total, message: `准备免费识别 ${percent}% · ${asset.label}（${(loaded / 1e6).toFixed(1)} / ${(total / 1e6).toFixed(1)} MB）` });
+    onProgress({ stage: 'download', percent, loaded, total, message: `准备识别 ${percent}% · ${asset.label}（${(loaded / 1e6).toFixed(1)} / ${(total / 1e6).toFixed(1)} MB）` });
   }
   async function load(asset) {
     if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
     const url = new URL(asset.path, import.meta.url).href;
     try {
       const stored = await durable?.get(url);
-      if (stored?.byteLength === asset.bytes) { report(asset, stored.byteLength, true); return new Blob([stored], { type: asset.type }); }
+      if (stored?.byteLength === asset.bytes) {
+        const blob = new Blob([stored], { type: asset.type });
+        if (await verified(blob, asset)) { report(asset, stored.byteLength, true); return blob; }
+      }
     } catch { /* CacheStorage and then download remain available. */ }
     let saved;
     // Prefer the explicit Cache; global lookup can also reuse complete legacy app files.
     try { saved = await cache?.match?.(url) || await storage?.match(url); } catch { /* Cache is optional. */ }
     if (saved?.ok) {
       const blob = await saved.blob();
-      if (blob.size === asset.bytes) {
+      if (await verified(blob, asset)) {
         if (durable) await save(url, blob, asset.type);
         report(asset, blob.size, true); return blob.slice(0, blob.size, asset.type);
       }
       try { await cache?.delete(url); } catch { /* A bad entry is never used. */ }
     }
-    let timer, stalled = false;
-    const refresh = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => { stalled = true; controller.abort(); }, stallMs);
-    };
-    report(asset, 0, true); refresh();
-    try {
-      const response = await fetchImpl(url, { signal: controller.signal });
-      if (!response.ok) throw new Error(`${asset.label}下载失败（HTTP ${response.status}）。请重试；笔迹未清除。`);
-      if (/text\/html/i.test(response.headers.get('content-type') || '')) throw new Error(`${asset.label}返回了网页而不是模型，请刷新到新版后重试。`);
-      const chunks = []; let received = 0;
-      if (response.body?.getReader) {
-        const reader = response.body.getReader();
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            if (value.byteLength) { chunks.push(value); received += value.byteLength; refresh(); report(asset, received); }
-          }
-        } finally { reader.releaseLock(); }
-      } else {
-        const bytes = new Uint8Array(await response.arrayBuffer()); chunks.push(bytes); received = bytes.byteLength;
-      }
-      if (received !== asset.bytes) throw new Error(`${asset.label}下载不完整，请重试；不会使用不完整的模型。`);
-      clearTimeout(timer);
-      const blob = new Blob(chunks, { type: asset.type });
-      // Only complete files enter the cache; retry reuses files that finished downloading.
-      await save(url, blob, asset.type);
-      report(asset, received, true);
-      return blob;
-    } catch (error) {
-      if (stalled) throw new Error(`${asset.label}下载已${Math.round(stallMs / 1000)}秒没有进展，已停止等待。请检查网络后重试；笔迹未清除。`);
-      if (error instanceof TypeError && !controller.signal.aborted) throw new Error(`${asset.label}下载连接失败，请检查网络后点“重试批改”；笔迹未清除。`);
-      throw error;
-    } finally { clearTimeout(timer); }
+    let lastError;
+    const sources = asset.sources?.length ? asset.sources : [asset.path];
+    for (let index = 0; index < sources.length; index++) {
+      if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      const attempt = new AbortController();
+      const stop = () => attempt.abort(); controller.signal.addEventListener('abort', stop, { once: true });
+      const waitLimit = index === 0 && sources.length > 1 ? Math.min(stallMs, 8000) : stallMs;
+      let timer, stalled = false;
+      const refresh = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => { stalled = true; attempt.abort(); }, waitLimit);
+      };
+      report(asset, 0, true); refresh();
+      try {
+        const source = new URL(sources[index], import.meta.url).href;
+        const response = await fetchImpl(source, { signal: attempt.signal, credentials: 'omit', referrerPolicy: 'no-referrer' });
+        if (!response.ok) throw new Error(`${asset.label}下载失败（HTTP ${response.status}）。请重试；笔迹未清除。`);
+        if (/text\/html/i.test(response.headers.get('content-type') || '')) throw new Error(`${asset.label}返回了网页而不是模型，请刷新到新版后重试。`);
+        const chunks = []; let received = 0;
+        if (response.body?.getReader) {
+          const reader = response.body.getReader();
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              if (value.byteLength) { chunks.push(value); received += value.byteLength; refresh(); report(asset, received); }
+            }
+          } finally { reader.releaseLock(); }
+        } else {
+          const bytes = new Uint8Array(await response.arrayBuffer()); chunks.push(bytes); received = bytes.byteLength;
+        }
+        if (received !== asset.bytes) throw new Error(`${asset.label}下载不完整，请重试；不会使用不完整的模型。`);
+        clearTimeout(timer);
+        const blob = new Blob(chunks, { type: asset.type });
+        if (!await verified(blob, asset)) throw new Error(`${asset.label}内容校验失败，请重试；未使用未经校验的组件。`);
+        // Only complete files enter the cache; retry reuses files that finished downloading.
+        await save(url, blob, asset.type);
+        report(asset, received, true);
+        return blob;
+      } catch (error) {
+        if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+        lastError = stalled ? new Error(`${asset.label}下载已${Math.round(waitLimit / 1000)}秒没有进展，已停止等待。请检查网络后重试；笔迹未清除。`) : error instanceof TypeError ? new Error(`${asset.label}下载连接失败，请检查网络后点“重试批改”；笔迹未清除。`) : error;
+      } finally { clearTimeout(timer); attempt.abort(); controller.signal.removeEventListener('abort', stop); }
+    }
+    throw lastError;
   }
   // Two concurrent downloads avoid serial startup without creating a mobile memory spike.
   let next = 0, firstError;

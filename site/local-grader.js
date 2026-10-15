@@ -36,14 +36,14 @@
     if (!lines.length || lines.some(item => !Number.isFinite(item.score) || item.score < .85)) return { status: 'uncertain', recognized, explanation: '有些笔迹未能可靠辨认，请重写后再提交。本题暂不计对错。' };
     if (question.kind === 'spelling') {
       const correct = question.expected.some(answer => normalizeSpelling(answer) === normalizeSpelling(recognized));
-      return { status: correct ? 'correct' : 'wrong', recognized, explanation: correct ? '英文拼写与参考答案一致。免费核对已完成。' : `识别到“${recognized}”，参考拼写为“${question.expected.join(' / ')}”。请检查字母、顺序与空格；如与原笔迹不符，可标记“识别有误”。` };
+      return { status: correct ? 'correct' : 'wrong', recognized, explanation: correct ? '英文拼写与参考答案一致。' : `识别到“${recognized}”，参考拼写为“${question.expected.join(' / ')}”。请检查字母、顺序与空格；如与原笔迹不符，可标记“识别有误”。` };
     }
     const expected = [...question.expected, ...(meaningAliases[question.prompt.toLowerCase()] || [])];
     const parts = recognized.split(/[；;,，、/]+/).filter(Boolean);
     const correct = parts.length > 0 && parts.every(part => matchesAny(part, expected));
     if (correct) return { status: 'correct', recognized, explanation: '您的表达在本题已收录的正确释义中，不要求与参考答案逐字相同。' };
     const knownOtherMeaning = Object.entries(meaningAliases).some(([word, aliases]) => word !== question.prompt.toLowerCase() && matchesAny(recognized, aliases));
-    return { status: knownOtherMeaning ? 'wrong' : 'uncertain', recognized, explanation: knownOtherMeaning ? '识别出的意思与本题收录的词义不一致。请查看参考答案；如原笔迹被识别错，可标记“识别有误”。' : '这个表达尚未收录，免费规则暂时无法可靠判断。先标为待核实，不算答错；可换一种表达重写。' };
+    return { status: knownOtherMeaning ? 'wrong' : 'uncertain', recognized, explanation: knownOtherMeaning ? '识别出的意思与本题收录的词义不一致。请查看参考答案；如原笔迹被识别错，可标记“识别有误”。' : '这个表达尚未收录，暂时无法可靠判断。先标为待核实，不算答错；可换一种表达重写。' };
   }
   root.LocalGrader = Object.freeze({ normalize, matchesAny, normalizeSpelling, gradeRecognized });
 })(typeof window === "undefined" ? globalThis : window);
