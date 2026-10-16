@@ -153,13 +153,10 @@ function renderToday() {
 }
 
 let direction = "en-zh", currentWord = null, wordToday = 0;
-function words() { return [...coreWords, ...state.customWords]; }
+function words() { return [...new Map([...coreWords, ...state.customWords].map(word => [word[0].toLowerCase(), word])).values()]; }
 function nextWord(preferred = null) {
-  const all = words(), due = all.filter(w => {
-    const stat = state.wordStats[w[0]]; return !stat || !stat.next || stat.next <= todayKey();
-  });
-  const pool = (due.length ? due : all).filter(w => w[0] !== currentWord?.[0]);
-  currentWord = all.find(w => w[0] === preferred) || (pool.length ? pool : all)[Math.floor(Math.random() * (pool.length || all.length))];
+  state.wordRounds ||= {};
+  currentWord = window.WordRounds.select(state.wordRounds, direction, words(), state.wordStats, todayKey(), preferred);
   state.activeWord = currentWord[0]; state.wordDirection = direction; saveState();
   document.getElementById("wordPrompt").textContent = direction === "en-zh" ? currentWord[0] : currentWord[1];
   document.getElementById("wordMeaning").textContent = direction === "en-zh" ? currentWord[1] : currentWord[0];
@@ -181,11 +178,16 @@ function renderWordMeta() {
 }
 document.querySelectorAll("[data-direction]").forEach(btn => btn.onclick = () => {
   if (document.getElementById("wordWorkspace").busy) return;
+  if (direction === btn.dataset.direction) return;
   direction = btn.dataset.direction; document.querySelectorAll("[data-direction]").forEach(b => b.classList.toggle("active", b === btn)); nextWord();
 });
 document.getElementById("wordWorkspace").addEventListener("answer-graded", () => document.getElementById("wordAnswer").classList.remove("hidden"));
 document.getElementById("wordWorkspace").addEventListener("answer-invalidated", () => document.getElementById("wordAnswer").classList.add("hidden"));
-document.getElementById("wordWorkspace").addEventListener("answer-skipped", () => { nextWord(); toast("已暂存，本题不计对错，可在答题记录中重练"); });
+document.getElementById("wordWorkspace").addEventListener("answer-skipped", event => {
+  const question = event.detail.question, word = question.id.slice(question.id.indexOf(":") + 1), mode = question.kind === "meaning" ? "en-zh" : "zh-en";
+  window.WordRounds.complete(state.wordRounds, mode, word);
+  nextWord(); toast("本题已保留待核实");
+});
 document.getElementById("wordWorkspace").addEventListener("answer-repeat", event => {
   const question = event.detail; direction = question.kind === "meaning" ? "en-zh" : "zh-en";
   document.querySelectorAll("[data-direction]").forEach(button => button.classList.toggle("active", button.dataset.direction === direction));
@@ -193,6 +195,7 @@ document.getElementById("wordWorkspace").addEventListener("answer-repeat", event
 });
 document.getElementById("wordWorkspace").addEventListener("answer-completed", event => {
   const attempt = event.detail, word = attempt.question.id.slice(attempt.question.id.indexOf(":") + 1);
+  window.WordRounds.complete(state.wordRounds, attempt.question.kind === "meaning" ? "en-zh" : "zh-en", word);
   const correct = attempt.status === "correct", next = new Date(); next.setDate(next.getDate() + (correct ? 4 : 1));
   state.wordStats[word] = { rating: correct ? 3 : 0, next: next.toISOString().slice(0, 10), last: todayKey(), reasons: attempt.reasons };
   state.wordReviewed++; wordToday++; if (wordToday >= 30) dayRecord().words = true;

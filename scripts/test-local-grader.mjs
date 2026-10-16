@@ -40,4 +40,6 @@ assert.equal(typed({ ...spelling, expected: ['colour', 'color'] }, 'color').stat
 assert.equal(typed({ ...spelling, expected: ['take part in'] }, 'takepartin').status, 'wrong');
 assert.equal(grader.wordErrorReasons('meaning').includes('听音没听清'), false);
 assert.equal(grader.wordErrorReasons('spelling').includes('漏写或多写字母'), true);
+assert.equal(grader.wordErrorReasons('meaning').includes('完全不会'), true);
+assert.equal(grader.wordErrorReasons('spelling').includes('完全不会'), true);
 console.log('Typed word checks passed: exact spelling, character diff, meaning aliases, mixed answers, unknown meanings and direction-specific reasons.');

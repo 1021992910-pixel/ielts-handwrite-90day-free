@@ -300,11 +300,9 @@ word-answer-workspace { display: block; min-width: 0; }
 .typed-workspace fieldset { border: 0; border-top: 1px solid #eadcc4; padding: 12px 0 0; margin: 16px 0 0; min-width: 0; }
 .typed-workspace legend { padding: 0 6px 0 0; color: #79592b; font-weight: 700; }
 .typed-workspace .error-reasons small { display: block; color: #7b715f; line-height: 1.7; margin-top: 10px; }
-.spelling-diff { padding: 14px; background: #fffefb; border: 1px solid #e8dfcf; border-radius: 12px; }
-.spelling-diff > div { display: flex; gap: 12px; align-items: baseline; margin: 6px 0; }
-.spelling-diff > div > span { font-size: .8rem; flex: 0 0 65px; color: var(--muted); }
-.spelling-diff code { font: 1.15rem/1.8 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-.spelling-diff small { color: #7a715f; line-height: 1.6; }
+.typed-workspace .answer-spelling { font: 1.2rem/1.7 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.typed-workspace .grade-result dl { margin: 14px 0; gap: 12px; }
+.typed-workspace .grade-actions { justify-content: flex-end; }
 .letter-changed, .letter-extra { background: #ffe2bd; color: #713800; border-bottom: 2px solid #c77625; }
 .letter-missing { background: #d8f0de; color: #155c39; border-bottom: 2px solid #408461; }
 .legacy-word-draft { padding: 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }

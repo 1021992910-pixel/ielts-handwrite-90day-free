@@ -83,13 +83,13 @@
     const unknown = parts.filter(value => !accepted(value));
     const clearlyDifferent = unknown.length && unknown.every(value => Object.entries(meaningAliases).some(([word, aliases]) => word !== key && matchesAny(value, aliases)));
     return { status: clearlyDifferent ? 'wrong' : 'uncertain', recognized, explanation: clearlyDifferent
-      ? '答案中有与本题已收录词义不一致的内容。请对照释义和例句；如认为判断有误，可暂存待核实，不会记为答错。'
-      : '这个表达尚未收录，当前无法可靠判断，暂不计对错。可修改表达后再次提交，或暂存并下一题。' };
+      ? '答案中有与本题已收录词义不一致的内容。请对照释义和例句，记录错因。'
+      : '这个表达尚未收录，当前无法可靠判断，已保留待核实。' };
   }
   function wordErrorReasons(kind) {
     return kind === 'spelling'
-      ? ['没记住英文', '漏写或多写字母', '字母顺序混淆', '与其他单词混淆', '词形或空格错误', '输入失误', '暂不确定原因']
-      : ['没记住词义', '与其他词义混淆', '只记住部分意思', '输入失误', '暂不确定原因'];
+      ? ['完全不会', '没记住英文', '漏写或多写字母', '字母顺序混淆', '与其他单词混淆', '词形或空格错误', '输入失误', '暂不确定原因']
+      : ['完全不会', '没记住词义', '与其他词义混淆', '只记住部分意思', '输入失误', '暂不确定原因'];
   }
   root.LocalGrader = Object.freeze({ normalize, matchesAny, normalizeSpelling, gradeRecognized, gradeTyped, spellingDiff, wordErrorReasons });
 })(typeof window === "undefined" ? globalThis : window);

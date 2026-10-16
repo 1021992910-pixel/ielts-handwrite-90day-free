@@ -16,25 +16,24 @@
         <p class="submission-error hidden" role="alert"></p>
         <section class="grade-result hidden" role="status" aria-live="polite"><strong class="grade-title"></strong>
           <dl><div><dt>我的答案</dt><dd data-recognized></dd></div><div><dt>参考答案</dt><dd data-expected></dd></div></dl>
-          <div class="spelling-diff hidden" aria-label="拼写差异"><div><span>我的拼写</span><code data-entered-diff></code></div><div><span>参考拼写</span><code data-target-diff></code></div><small>橙色标出不同或多写的字母，绿色标出需要补上的字母；空格显示为 ␣。</small></div>
           <p data-explanation></p>
-          <fieldset class="error-reasons hidden"><legend>这次主要错在哪里？可多选</legend><div class="reason-options"></div><small>系统已判断结果；这里只记录复习原因，不需要您判对错。不确定可选“暂不确定原因”。</small></fieldset>
-          <div class="grade-actions"><button class="secondary" data-edit type="button">修改后重交</button><button class="text-button" data-dispute type="button">判断有疑问，暂不计分</button><button class="primary" data-next type="button">保存并下一题</button><button class="secondary hidden" data-skip type="button">暂存并下一题</button></div>
+          <fieldset class="error-reasons hidden"><legend>错在哪里？可多选</legend><div class="reason-options"></div></fieldset>
+          <div class="grade-actions"><button class="primary" data-next type="button">下一题</button></div>
         </section>
         <details class="legacy-word-draft hidden"><summary>查看保留的旧版手写草稿</summary><div></div></details>
         <details class="answer-history"><summary>答题记录 <span class="history-count">0</span></summary><div class="history-list"></div></details>
       </div>`;
       this.input = this.querySelector('textarea'); this.savePromise = Promise.resolve(); this.historyVersion = 0;
-      this.input.addEventListener('input', () => { this.revision++; this.attempt = null; this.hideResult(); this.queueDraft(); });
+      this.input.addEventListener('input', () => {
+        if (this.attempt) { this.input.value = this.attempt.answer || ''; return; }
+        this.revision++; this.hideResult(); this.queueDraft();
+      });
       this.input.addEventListener('keydown', event => {
         if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) { event.preventDefault(); this.submit(); }
       });
       this.querySelector('[data-submit]').onclick = () => this.submit();
-      this.querySelector('[data-clear]').onclick = () => this.edit(true);
-      this.querySelector('[data-edit]').onclick = () => this.edit(false);
-      this.querySelector('[data-next]').onclick = () => this.finish(false);
-      this.querySelector('[data-skip]').onclick = () => this.finish(true);
-      this.querySelector('[data-dispute]').onclick = () => this.dispute();
+      this.querySelector('[data-clear]').onclick = () => this.clearInput();
+      this.querySelector('[data-next]').onclick = () => this.finish();
       this.querySelector('[data-unknown]').onclick = () => this.submit(true);
     }
     disconnectedCallback() { this.generation = null; }
@@ -52,6 +51,7 @@
     }
     hideResult() {
       this.querySelector('.grade-result').classList.add('hidden'); this.error();
+      this.querySelector('.typed-answer-panel').classList.remove('hidden');
       this.dispatchEvent(new CustomEvent('answer-invalidated', { bubbles: true }));
     }
     queueDraft() {
@@ -102,7 +102,7 @@
       this.setBusy(true); this.error();
       try {
         await this.queueDraft();
-        const attempt = { id: crypto.randomUUID(), question, inputMode: 'typed', answer, strokes: [], ...result, expected: question.expected.join('；'), reasons: [], createdAt: new Date().toISOString(), counted: false, unknown };
+        const attempt = { id: crypto.randomUUID(), question, inputMode: 'typed', answer, strokes: [], ...result, expected: question.expected.join('；'), reasons: unknown ? ['完全不会'] : [], createdAt: new Date().toISOString(), counted: false, unknown };
         await notebook.put(`attempt:${attempt.id}`, attempt);
         if (generation !== this.generation) return;
         this.attempt = attempt; await this.queueDraft();
@@ -115,14 +115,15 @@
     renderResult() {
       const attempt = this.attempt, root = this.querySelector('.grade-result');
       root.className = `grade-result ${attempt.status}`;
-      root.querySelector('.grade-title').textContent = { correct: '✓ 本题答对了', wrong: '本题需要复习', uncertain: '待核实 · 暂不计对错' }[attempt.status];
-      root.querySelector('[data-recognized]').textContent = attempt.unknown ? '暂时不会' : attempt.answer || attempt.recognized;
+      this.querySelector('.typed-answer-panel').classList.add('hidden');
+      root.querySelector('.grade-title').textContent = { correct: '✓ 本题答对了', wrong: '本题需要复习', uncertain: '释义待核实' }[attempt.status];
+      root.querySelector('[data-recognized]').textContent = attempt.unknown ? '完全不会' : attempt.answer || attempt.recognized;
       root.querySelector('[data-expected]').textContent = attempt.expected;
-      root.querySelector('[data-explanation]').textContent = attempt.explanation;
+      root.querySelector('[data-explanation]').textContent = attempt.unknown ? '本次记录为完全不会。'
+        : attempt.status === 'uncertain' ? '这个释义尚未收录，已保留待核实。'
+        : attempt.status === 'correct' ? '' : attempt.question.kind === 'spelling' ? '请核对标色字母。' : '请对照参考词义。';
+      root.querySelector('[data-explanation]').classList.toggle('hidden', attempt.status === 'correct');
       root.querySelector('.error-reasons').classList.toggle('hidden', attempt.status !== 'wrong');
-      root.querySelector('[data-next]').classList.toggle('hidden', attempt.status === 'uncertain');
-      root.querySelector('[data-skip]').classList.toggle('hidden', attempt.status !== 'uncertain');
-      root.querySelector('[data-dispute]').classList.toggle('hidden', attempt.status === 'uncertain');
       const options = root.querySelector('.reason-options'); options.replaceChildren();
       for (const reason of window.LocalGrader.wordErrorReasons(attempt.question.kind)) {
         const label = document.createElement('label'), input = document.createElement('input');
@@ -134,33 +135,22 @@
         };
         label.append(input, document.createTextNode(reason)); options.append(label);
       }
-      const diff = attempt.diff; root.querySelector('.spelling-diff').classList.toggle('hidden', !diff || attempt.unknown);
-      if (diff) for (const [selector, tokens] of [['[data-entered-diff]', diff.entered], ['[data-target-diff]', diff.target]]) {
+      const diff = attempt.diff;
+      root.querySelectorAll('dd').forEach(line => line.classList.toggle('answer-spelling', attempt.question.kind === 'spelling' && !attempt.unknown));
+      if (diff && !attempt.unknown) for (const [selector, tokens] of [['[data-recognized]', diff.entered], ['[data-expected]', diff.target]]) {
         const line = root.querySelector(selector); line.replaceChildren();
         for (const token of tokens) { const span = document.createElement('span'); span.className = `letter-${token.kind}`; span.textContent = token.char === ' ' ? '␣' : token.char; line.append(span); }
       }
     }
-    async edit(clear) {
-      if (this.busy) return;
-      this.attempt = null; if (clear) this.input.value = ''; this.revision++; this.hideResult(); this.input.readOnly = false;
+    clearInput() {
+      if (this.busy || this.attempt) return;
+      this.input.value = ''; this.revision++; this.hideResult(); this.input.readOnly = false;
       this.queueDraft(); this.input.focus();
     }
-    async dispute() {
-      if (this.busy || !this.attempt) return;
-      const generation = this.generation, attempt = this.attempt;
-      this.setBusy(true);
-      try {
-        attempt.status = 'uncertain'; attempt.disputed = true; attempt.reasons = [];
-        attempt.explanation = '已记录判断疑问，本题暂不计对错。可以修改后重新提交，或暂存并下一题；原答案会保留。';
-        await this.savePromise; await notebook.put(`attempt:${attempt.id}`, attempt); await this.queueDraft();
-        if (generation === this.generation) { this.renderResult(); this.renderHistory(); }
-      } catch { this.error('判断疑问未保存，请重试；本题尚未计分。'); }
-      finally { if (generation === this.generation) this.setBusy(false); }
-    }
-    async finish(skip) {
-      const attempt = this.attempt;
-      if (this.busy || !attempt || attempt.counted || attempt.skipped || (attempt.status === 'uncertain') !== skip) return;
-      if (!skip && attempt.status === 'wrong' && !attempt.reasons.length) { this.error('请选择错因；拿不准可选“暂不确定原因”，再保存并下一题。'); return; }
+    async finish() {
+      const attempt = this.attempt, skip = attempt?.status === 'uncertain';
+      if (this.busy || !attempt || attempt.counted || attempt.skipped) return;
+      if (attempt.status === 'wrong' && !attempt.reasons.length) { this.error('请选择错因，再点“下一题”。'); return; }
       const generation = this.generation, draftKey = this.draftKey(); this.setBusy(true); this.error();
       try {
         await this.savePromise; const saved = { ...copy(attempt), counted: !skip, skipped: skip };
@@ -191,12 +181,10 @@
         for (const attempt of attempts.slice(0, this.historyLimit)) {
           const item = document.createElement('details'); item.className = 'history-item';
           const summary = document.createElement('summary'); summary.textContent = `${attempt.question.prompt} · ${{ correct: '答对', wrong: '需复习', uncertain: '待核实' }[attempt.status] || '待核实'} · ${new Date(attempt.createdAt).toLocaleString('zh-CN')}`;
-          const body = document.createElement('div'), answer = document.createElement('p'), reasons = document.createElement('p'), repeat = document.createElement('button');
+          const body = document.createElement('div'), answer = document.createElement('p'), reasons = document.createElement('p');
           answer.textContent = `${attempt.inputMode === 'typed' ? '输入答案' : '旧版识别'}：${attempt.unknown ? '暂时不会' : attempt.answer || attempt.recognized || '未识别'}；参考答案：${attempt.expected}`;
           reasons.textContent = `错因：${(attempt.reasons || []).join('、') || '未记录'}。${attempt.explanation || ''}`;
-          repeat.className = 'secondary'; repeat.textContent = '重新练这题'; repeat.disabled = this.busy;
-          repeat.onclick = () => { if (!this.busy) this.dispatchEvent(new CustomEvent('answer-repeat', { bubbles: true, detail: copy(attempt.question) })); };
-          body.append(answer, reasons, repeat); item.append(summary, body);
+          body.append(answer, reasons); item.append(summary, body);
           if (attempt.inputMode !== 'typed' && attempt.strokes?.length) item.addEventListener('toggle', () => { if (item.open && !body.querySelector('img')) body.prepend(this.legacyImage(attempt.strokes)); });
           list.append(item);
         }

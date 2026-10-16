@@ -8,8 +8,10 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const playwright = require('C:/Users/10219/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const root = fileURLToPath(new URL('../', import.meta.url)), site = resolve(root, 'site');
-const oldFiles = new Set(['index.html', 'sw.js', 'local-grader.js', 'app.js', 'styles.css']);
-const snapshot = new Map([...oldFiles].map(file => [file, execFileSync('git', ['show', `2d8a624:site/${file}`], { cwd: root })]));
+const baseline = process.env.WORDS_UPGRADE_FROM || '361ec16';
+const oldFiles = new Set(['index.html', 'sw.js', 'local-grader.js', 'app.js', 'styles.css', ...(baseline === '2d8a624' ? [] : ['word-answers.js'])]);
+const snapshot = new Map([...oldFiles].map(file => [file, execFileSync('git', ['show', `${baseline}:site/${file}`], { cwd: root })]));
+const oldCache = snapshot.get('sw.js').toString().match(/const CACHE = "([^"]+)"/)[1];
 let oldVersion = true;
 const server = http.createServer(async (request, response) => {
   const file = new URL(request.url, 'http://test').pathname.replace(/^\/study\//, '') || 'index.html';
@@ -29,13 +31,16 @@ try {
   const page = await context.newPage(), errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(url);
   await page.evaluate(() => navigator.serviceWorker.ready);
-  await page.waitForFunction(async () => (await caches.keys()).includes('ielts-handwrite-local-ocr-v9'));
+  await page.waitForFunction(async cacheName => (await caches.keys()).includes(cacheName), oldCache);
   await page.reload();
-  await page.waitForFunction(() => navigator.serviceWorker.controller && !document.querySelector('#wordWorkspace').pad.loading);
+  await page.waitForFunction(() => {
+    const workspace = document.querySelector('#wordWorkspace');
+    return navigator.serviceWorker.controller && (workspace.pad ? !workspace.pad.loading : workspace.question && !workspace.busy);
+  });
   await page.evaluate(() => { state.activeWord = 'different'; state.wordDirection = 'en-zh'; state.wordReviewed = 17; saveState(); });
   oldVersion = false;
   // Old cache controls this navigation; versioned scripts must still load the new grader.
-  await page.goto(`${url}index.html?v=1016A`);
+  await page.goto(`${url}index.html?v=1016B`);
   await page.waitForFunction(() => document.querySelector('#wordWorkspace')?.input && !document.querySelector('#wordWorkspace').busy);
   await page.locator('[data-view=words]').click();
   assert.equal(await page.evaluate(() => state.wordReviewed), 17);
@@ -43,8 +48,8 @@ try {
   await page.locator('#wordWorkspace [data-submit]').click();
   await page.locator('#wordWorkspace .grade-result.correct').waitFor();
   await page.waitForFunction(async () => {
-    const cache = await caches.open('ielts-handwrite-words-v10');
-    return Boolean(await cache.match('./word-answers.js?v=1016A'));
+    const cache = await caches.open('ielts-handwrite-words-v11');
+    return Boolean(await cache.match('./word-answers.js?v=1016B'));
   });
   if (browserName === 'chromium') {
     await context.setOffline(true);
@@ -55,5 +60,5 @@ try {
   }
   assert.equal(await page.evaluate(() => state.wordReviewed), 17);
   assert.deepEqual(errors, []);
-  console.log(`Cache upgrade ${browserName} passed: old cached page to new versioned grader, preserved state and result.${browserName === 'chromium' ? ' Offline reload also passed.' : ' WebKit offline navigation excluded: this test runtime reports an internal engine error; physical iPad offline behavior is not verified.'}`);
+  console.log(`Cache upgrade ${browserName} from ${baseline} passed: old cached page to new versioned grader, preserved state and result.${browserName === 'chromium' ? ' Offline reload also passed.' : ' WebKit offline navigation excluded: this test runtime reports an internal engine error; physical iPad offline behavior is not verified.'}`);
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
