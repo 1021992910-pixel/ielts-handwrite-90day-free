@@ -98,7 +98,7 @@ try {
   await select('different'); await workspace().locator('[data-clear]').click(); await submit('不一样', 'correct');
   await workspace().locator('.answer-history > summary').click();
   const legacy = workspace().locator('.history-item').filter({ hasText: '旧版记录' });
-  await legacy.locator('summary').click(); assert.equal(await legacy.locator('img').isVisible(), true);
+  await legacy.locator('summary').click(); await legacy.locator('img').waitFor({ state: 'visible' });
   assert.ok((await page.evaluate(() => HandwritingNotebook.get('draft:words:en-zh:different'))).length);
   assert.equal(await page.evaluate(() => state.readingText), '原有阅读材料');
   assert.equal(await page.evaluate(() => state.spellingReviewed), 11);
