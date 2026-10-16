@@ -170,7 +170,7 @@ function nextWord(preferred = null) {
     id: `${direction}:${currentWord[0].toLowerCase()}`, module: "words", kind: direction === "en-zh" ? "meaning" : "spelling",
     prompt: direction === "en-zh" ? currentWord[0] : currentWord[1],
     expected: direction === "en-zh" ? currentWord[1].split(/[；;,，、/]+/).filter(Boolean) : [currentWord[0]],
-    title: direction === "en-zh" ? "写出中文意思" : "写出英文单词"
+    title: direction === "en-zh" ? "输入中文意思" : "输入英文单词"
   });
   renderWordMeta();
 }
@@ -180,6 +180,7 @@ function renderWordMeta() {
   document.getElementById("wordDue").textContent = `待复习 ${due}`;
 }
 document.querySelectorAll("[data-direction]").forEach(btn => btn.onclick = () => {
+  if (document.getElementById("wordWorkspace").busy) return;
   direction = btn.dataset.direction; document.querySelectorAll("[data-direction]").forEach(b => b.classList.toggle("active", b === btn)); nextWord();
 });
 document.getElementById("wordWorkspace").addEventListener("answer-graded", () => document.getElementById("wordAnswer").classList.remove("hidden"));

@@ -286,3 +286,27 @@ answer-workspace .canvas-wrap { min-height: 0; aspect-ratio: 1.9; }
   .view.active { display: block !important; }
   .panel { box-shadow: none; break-inside: avoid; }
 }
+
+/* Word practice uses a keyboard; other modules keep their existing workspaces. */
+word-answer-workspace { display: block; min-width: 0; }
+.typed-answer-panel { padding: 24px; }
+.typed-label { display: block; color: var(--navy); font-size: 1.2rem; font-weight: 700; }
+.typed-answer-panel textarea { display: block; box-sizing: border-box; width: 100%; min-height: 125px; padding: 16px; border: 2px solid #c7d9ce; border-radius: 14px; background: #fffefb; font: inherit; font-size: 1.25rem; line-height: 1.6; resize: vertical; }
+.typed-answer-panel textarea:focus { outline: 3px solid #dceae1; border-color: var(--navy); }
+.typed-answer-panel textarea[readonly] { background: #f3f6f2; }
+.typed-input-footer { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin: 8px 0; font-size: .8rem; color: var(--muted); }
+.typed-workspace .submission-bar { margin-top: 12px; }
+.typed-workspace [data-unknown] { margin-top: 14px; text-align: left; }
+.typed-workspace fieldset { border: 0; border-top: 1px solid #eadcc4; padding: 12px 0 0; margin: 16px 0 0; min-width: 0; }
+.typed-workspace legend { padding: 0 6px 0 0; color: #79592b; font-weight: 700; }
+.typed-workspace .error-reasons small { display: block; color: #7b715f; line-height: 1.7; margin-top: 10px; }
+.spelling-diff { padding: 14px; background: #fffefb; border: 1px solid #e8dfcf; border-radius: 12px; }
+.spelling-diff > div { display: flex; gap: 12px; align-items: baseline; margin: 6px 0; }
+.spelling-diff > div > span { font-size: .8rem; flex: 0 0 65px; color: var(--muted); }
+.spelling-diff code { font: 1.15rem/1.8 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.spelling-diff small { color: #7a715f; line-height: 1.6; }
+.letter-changed, .letter-extra { background: #ffe2bd; color: #713800; border-bottom: 2px solid #c77625; }
+.letter-missing { background: #d8f0de; color: #155c39; border-bottom: 2px solid #408461; }
+.legacy-word-draft { padding: 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.legacy-word-draft img { display: block; width: 100%; }
+@media (max-width: 560px) { .typed-answer-panel { padding: 18px; } .typed-input-footer { align-items: flex-start; } }

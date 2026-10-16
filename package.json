@@ -7,6 +7,8 @@
     "validate": "node scripts/validate-artifact.mjs",
     "test": "node scripts/test-local-grader.mjs && node scripts/test-handwriting-api.mjs && node scripts/test-cache-scope.mjs && node scripts/test-ocr-loading.mjs",
     "test:notebook": "node scripts/test-notebook-browser.mjs",
+    "test:words": "node scripts/test-words-browser.mjs",
+    "test:word-cache": "node scripts/test-word-cache-upgrade.mjs",
     "prepare:ocr": "node scripts/prepare-free-ocr.mjs",
     "test:ocr": "node scripts/test-free-ocr.mjs"
   },

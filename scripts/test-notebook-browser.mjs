@@ -8,6 +8,14 @@ catch { playwright = require('C:/Users/10219/.cache/codex-runtimes/codex-primary
 const browserName = process.env.NOTEBOOK_BROWSER || 'chromium';
 const browser = await playwright[browserName].launch({ headless: true, ...(browserName === 'chromium' ? { channel: 'msedge' } : {}) });
 const context = await browser.newContext({ viewport: { width: 1180, height: 820 }, serviceWorkers: 'block', acceptDownloads: true, ...(browserName === 'webkit' ? { isMobile: true, hasTouch: true } : {}) });
+// Regression fixture for the unchanged handwriting component (still used by listening).
+// Production word practice now has its own keyboard-based browser test.
+await context.route('**/*', async route => {
+  if (route.request().resourceType() !== 'document') return route.continue();
+  const response = await route.fetch();
+  const body = (await response.text()).replace('<word-answer-workspace id="wordWorkspace" module="words"></word-answer-workspace>', '<answer-workspace id="wordWorkspace" module="words"></answer-workspace>');
+  await route.fulfill({ response, body });
+});
 const page = await context.newPage(), errors = [];
 page.on('pageerror', error => errors.push(error.message));
 const url = process.env.NOTEBOOK_TEST_URL || 'http://127.0.0.1:4183/';

@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#234e4a">
-  <meta name="app-version" content="student-20261015-a">
+  <meta name="app-version" content="words-20261016-a">
   <meta name="description" content="为平板手写设计的三个月雅思学习台">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23152b4f'/%3E%3Cpath d='M17 45l7-19 6 14 7-25 10 30' fill='none' stroke='%23f0b75b' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <title>90天雅思手写学习台</title>
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=1016A">
 </head>
 <body>
   <div class="app-shell">
@@ -85,14 +85,14 @@
             <div class="word-meta"><span id="wordProgress">今日 0 / 30</span><span id="wordDue">待复习 0</span></div>
             <div class="word-prompt" id="wordPrompt">environment</div>
             <button class="icon-button" id="speakWord" aria-label="播放发音">🔊 听发音</button>
-            <p class="answer-instruction">在本题答题纸上直接写出答案。写完点「提交批改」，再选择需要记录的错因。</p>
+            <p class="answer-instruction">独立输入完整答案，点「提交核对」。系统判断后显示释义、搭配和例句；答错再记录错因。</p>
             <div class="answer-box hidden" id="wordAnswer">
               <strong id="wordMeaning">环境</strong>
               <p id="wordCollocation">protect the environment · 保护环境</p>
               <p id="wordExample">We should protect the environment.</p>
             </div>
           </article>
-          <answer-workspace id="wordWorkspace" module="words"></answer-workspace>
+          <word-answer-workspace id="wordWorkspace" module="words"></word-answer-workspace>
         </div>
         <article class="panel import-card">
           <div><h3>词库管理</h3><p>可导入您的雅思词库。每行格式：<code>English=Chinese|collocation|example</code></p></div>
@@ -299,14 +299,15 @@
       </section>
     </main>
 
-    <footer class="study-footer"><span>每天一点积累，让进步看得见。</span><small>学员版 · 10.15A</small></footer>
+    <footer class="study-footer"><span>每天一点积累，让进步看得见。</span><small>单词更新 · 10.16A</small></footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
   <script src="./spelling-data.js"></script>
-  <script src="./local-grader.js"></script>
+  <script src="./local-grader.js?v=1016A"></script>
   <script src="./free-grader.js"></script>
   <script src="./handwriting.js"></script>
-  <script src="./app.js"></script>
+  <script src="./word-answers.js?v=1016A"></script>
+  <script src="./app.js?v=1016A"></script>
 </body>
 </html>
