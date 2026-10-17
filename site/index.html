@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#234e4a">
-  <meta name="app-version" content="words-20261017-c">
+  <meta name="app-version" content="speaking-20261017-d">
   <meta name="description" content="为平板手写设计的三个月雅思学习台">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23152b4f'/%3E%3Cpath d='M17 45l7-19 6 14 7-25 10 30' fill='none' stroke='%23f0b75b' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <title>90天雅思手写学习台</title>
-  <link rel="stylesheet" href="./styles.css?v=1017B">
+  <link rel="stylesheet" href="./styles.css?v=1017D">
 </head>
 <body>
   <div class="app-shell">
@@ -32,7 +32,6 @@
       <button class="tab" data-view="reading">阅读</button>
       <button class="tab" data-view="speaking">口语</button>
       <button class="tab" data-view="writing">写作</button>
-      <button class="tab" data-view="templates">背诵模板</button>
       <button class="tab" data-view="progress">进度</button>
     </nav>
 
@@ -194,7 +193,6 @@
       </section>
 
       <section class="view" id="view-speaking">
-        <div class="section-title"><div><p class="kicker">45 分钟</p><h2>口语录音与重说</h2></div></div>
         <div class="two-col">
           <article class="panel speaking-card">
             <div class="word-meta"><span id="speakingPart">Part 1</span><button class="text-button" id="nextPrompt">换一题</button></div>
@@ -202,17 +200,26 @@
             <div class="answer-frame">
               <span>直接回答</span><b>→</b><span>理由</span><b>→</b><span>个人例子</span>
             </div>
+            <details class="speaking-example" id="speakingExample">
+              <summary>参考示例</summary>
+              <p id="speakingExampleText" lang="en"></p>
+              <p id="speakingExampleMeaning" class="muted"></p>
+              <p class="muted">原创表达示例，非官方范文。请按自己的经历调整。</p>
+              <button class="secondary" id="listenSpeakingExample">听示例</button>
+            </details>
+            <button class="secondary full" id="saveSpeakingAnswer">整理我的答案</button>
             <div class="timer" id="speakingTimer">00:00</div>
             <div class="record-controls">
               <button class="record" id="recordButton">● 开始录音</button>
               <button class="secondary" id="timerButton">开始计时</button>
             </div>
             <audio id="recordingPlayback" controls playsinline></audio>
-            <p class="muted" id="recordStatus">先说一遍，回听后修改，再说一遍。</p>
+            <p class="muted" id="recordStatus">可先听示例、整理答案，再练习录音。</p>
             <button class="primary full complete-module" data-module="speaking">完成今日口语</button>
           </article>
           <handwriting-pad pad-id="speaking-pad" title="口语提纲" hint="只写关键词，不写整段答案"></handwriting-pad>
         </div>
+        <div class="module-template-library" id="speakingTemplateHost"></div>
       </section>
 
       <section class="view" id="view-writing">
@@ -232,34 +239,35 @@
           </article>
           <handwriting-pad pad-id="writing-pad" title="写作纸" hint="建议横屏书写，可导出图片"></handwriting-pad>
         </div>
+        <div class="module-template-library" id="writingTemplateHost"></div>
       </section>
 
-      <section class="view" id="view-templates">
+      <template id="templateEditorMarkup">
         <div class="section-title">
-          <div><p class="kicker">第 5 周起重点使用</p><h2>答案模板与背诵</h2></div>
-          <button class="primary" id="newTemplate">＋ 新建模板</button>
+          <h3 data-field="Heading">我的答案与背诵</h3>
+          <button class="primary" data-field="New">＋ 新建模板</button>
         </div>
         <div class="template-layout">
-          <aside class="panel template-list" id="templateList"></aside>
+          <aside class="panel template-list" data-field="List"></aside>
           <article class="panel template-editor">
             <div class="editor-head">
-              <select id="templateType" aria-label="模板类型">
-                <option>口语 Part 1</option><option>口语 Part 2</option><option>口语 Part 3</option>
-                <option>写作 Task 1</option><option>写作 Task 2</option>
-              </select>
-              <button class="secondary" id="memoryMode">进入背诵模式</button>
+              <select data-field="Type" aria-label="模板类型"></select>
+              <button class="secondary" data-field="Memory">进入背诵模式</button>
             </div>
-            <label>话题<input id="templateTitle" placeholder="例如：我的家乡"></label>
-            <label>关键词<input id="templateKeywords" placeholder="例如：small city / friendly / riverside"></label>
-            <label>答题结构<textarea id="templateStructure" rows="3" placeholder="直接回答 → 理由 → 例子"></textarea></label>
-            <label>可替换句块<textarea id="templateChunks" rows="5" placeholder="I come from... / What I like most is..."></textarea></label>
-            <label>我的完整答案<textarea id="templateAnswer" rows="8" placeholder="用自己的经历完成答案……"></textarea></label>
+            <label>话题<input data-field="Title"></label>
+            <label>练习题目<input data-field="Prompt"></label>
+            <label>关键词<input data-field="Keywords"></label>
+            <label>答题结构<textarea data-field="Structure" rows="2"></textarea></label>
+            <label>可替换句块<textarea data-field="Chunks" rows="3"></textarea></label>
+            <label>我的完整答案<textarea data-field="Answer" rows="6"></textarea></label>
             <div class="template-actions">
-              <button class="primary" id="saveTemplate">保存模板</button>
-              <button class="secondary" id="practiceTemplate">关键词脱稿练习</button>
+              <button class="primary" data-field="Save">保存模板</button>
+              <button class="secondary" data-field="Listen">听我的答案</button>
+              <button class="secondary" data-field="Practice">用于口语练习</button>
             </div>
           </article>
         </div>
+      </template>
         <div class="memory-overlay hidden" id="memoryOverlay" role="dialog" aria-modal="true" aria-labelledby="memoryTitle">
           <div class="memory-card">
             <button class="close-button" id="closeMemory" aria-label="关闭">×</button>
@@ -270,9 +278,9 @@
             <div class="memory-answer hidden" id="memoryAnswer"></div>
             <button class="primary full" id="revealMemory">显示完整答案</button>
             <div class="rating-row hidden" id="memoryRatings"><button data-memory="forgot">需要再背</button><button data-memory="hard">有些卡顿</button><button data-memory="good">可以脱稿</button></div>
+            <button class="secondary full" id="memoryRecord">去录音练习</button>
           </div>
         </div>
-      </section>
 
       <section class="view" id="view-progress">
         <div class="section-title"><div><p class="kicker">只看进步，不做整套测试</p><h2>90 天学习进度</h2></div></div>
@@ -309,7 +317,7 @@
       </section>
     </main>
 
-    <footer class="study-footer"><span>每天一点积累，让进步看得见。</span><small>单词更新 · 10.17C</small></footer>
+    <footer class="study-footer"><span>每天一点积累，让进步看得见。</span><small>口语更新 · 10.17D</small></footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
@@ -320,6 +328,7 @@
   <script src="./word-rounds.js?v=1016B"></script>
   <script src="./word-practice.js?v=1017B"></script>
   <script src="./word-answers.js?v=1017C"></script>
-  <script src="./app.js?v=1017B"></script>
+  <script src="./study-templates.js?v=1017D"></script>
+  <script src="./app.js?v=1017D"></script>
 </body>
 </html>

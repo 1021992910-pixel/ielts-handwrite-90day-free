@@ -134,6 +134,14 @@ main { padding-top: 22px; }
 .record-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .record { background: #fff0f0; border-color: #efc3c5; color: var(--danger); }
 .record.recording { background: var(--danger); color: white; animation: pulse 1.2s infinite; }
+.speaking-example { margin: 18px 0; padding: 16px; border: 1px solid #e7d8b6; border-radius: 14px; background: var(--gold-soft); }
+.speaking-example summary { cursor: pointer; color: var(--navy); font-weight: 750; }
+.speaking-example [lang="en"] { font-size: 1.08rem; }
+.module-template-library { margin-top: 28px; }
+.module-template-library .section-title { margin-bottom: 14px; }
+.module-template-library .section-title h3 { margin: 0; }
+.template-actions { flex-wrap: wrap; }
+#memoryRecord { margin-top: 14px; }
 @keyframes pulse { 50% { opacity: .75; } }
 .writing-steps { display: grid; gap: 9px; margin: 18px 0 22px; }
 .writing-steps div { display: flex; gap: 10px; align-items: center; }

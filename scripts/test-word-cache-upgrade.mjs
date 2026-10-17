@@ -40,6 +40,7 @@ try {
   });
   await page.evaluate(() => {
     state.activeWord = 'different'; state.wordDirection = 'en-zh'; state.wordReviewed = 17;
+    state.templates.push({ id: 'upgrade-oral', type: '口语 Part 2', title: '旧口语答案', answer: 'My preserved speaking answer.', review: 'good' }, { id: 'upgrade-writing', type: '写作 Task 2', title: '旧写作答案', answer: 'My preserved writing answer.', review: 'hard' });
     if (window.WordPractice) {
       direction = 'en-zh'; wordSource = 'daily';
       state.wordSessions[sessionKey()] = WordPractice.create(words(), { id: crypto.randomUUID(), day: todayKey(), direction, preferred: 'different', random: false });
@@ -59,10 +60,14 @@ try {
   }
   oldVersion = false;
   // Old cache controls this navigation; versioned scripts must still load the new grader.
-  await page.goto(`${url}index.html?v=1017C`);
+  await page.goto(`${url}index.html?v=1017D`);
   await page.waitForFunction(() => document.querySelector('#wordWorkspace')?.input && !document.querySelector('#wordWorkspace').busy);
   await page.locator('[data-view=words]').click();
   assert.equal(await page.evaluate(() => state.wordReviewed), 17);
+  assert.equal(await page.evaluate(() => state.templates.find(item => item.id === 'upgrade-oral').answer), 'My preserved speaking answer.');
+  assert.equal(await page.evaluate(() => state.templates.find(item => item.id === 'upgrade-writing').review), 'hard');
+  assert.equal(await page.locator('#speakingTemplateHost .template-item').filter({ hasText: '旧口语答案' }).count(), 1);
+  assert.equal(await page.locator('#writingTemplateHost .template-item').filter({ hasText: '旧写作答案' }).count(), 1);
   if (pendingAnswer) {
     await page.locator('#wordWorkspace .grade-result.wrong').waitFor();
     assert.equal(await page.locator('#typedWordAnswer').inputValue(), '教育');
@@ -74,7 +79,7 @@ try {
     await page.locator('#wordWorkspace .grade-result.correct').waitFor();
   }
   await page.waitForFunction(async () => {
-    const cache = await caches.open('ielts-handwrite-words-v14');
+    const cache = await caches.open('ielts-handwrite-words-v15');
     return Boolean(await cache.match('./word-answers.js?v=1017C'));
   });
   if (browserName === 'chromium') {

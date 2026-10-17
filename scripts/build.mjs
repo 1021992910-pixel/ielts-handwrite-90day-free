@@ -12,6 +12,7 @@ const assetSpecs = [
   ["/word-answers.js", "word-answers.js", "text/javascript; charset=utf-8"],
   ["/word-rounds.js", "word-rounds.js", "text/javascript; charset=utf-8"],
   ["/word-practice.js", "word-practice.js", "text/javascript; charset=utf-8"],
+  ["/study-templates.js", "study-templates.js", "text/javascript; charset=utf-8"],
   ["/free-grader.js", "free-grader.js", "text/javascript; charset=utf-8"],
   ["/free-ocr-worker.js", "free-ocr-worker.js", "text/javascript; charset=utf-8"],
   ["/free-ocr-assets.js", "free-ocr-assets.js", "text/javascript; charset=utf-8"],

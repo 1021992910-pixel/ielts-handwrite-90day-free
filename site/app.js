@@ -116,6 +116,8 @@ const taskDefs = [
 ];
 
 function showView(name) {
+  if (name === 'templates') name = 'speaking';
+  if (name !== 'speaking' && 'speechSynthesis' in window) speechSynthesis.cancel();
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === `view-${name}`));
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === name));
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -379,9 +381,26 @@ document.getElementById("saveReading").onclick = () => { state.readingText = rea
 document.getElementById("readingFocus").onclick = () => { const p = document.querySelector(".reading-panel"); p.classList.toggle("focus-mode"); document.getElementById("readingFocus").textContent = p.classList.contains("focus-mode") ? "退出大字" : "大字阅读"; };
 document.querySelectorAll("[data-reading-step]").forEach(box => { box.checked = !!state.readingSteps[box.dataset.readingStep]; box.onchange = () => { state.readingSteps[box.dataset.readingStep] = box.checked; saveState(); }; });
 
-let speakingIndex = 0;
-function renderSpeaking() { const p = speakingPrompts[speakingIndex % speakingPrompts.length]; document.getElementById("speakingPart").textContent = p[0]; document.getElementById("speakingPrompt").textContent = p[1]; }
-document.getElementById("nextPrompt").onclick = () => { speakingIndex++; renderSpeaking(); };
+let speakingIndex = 0, activeSpeakingTemplate = null;
+function renderSpeaking(template = null) {
+  const p = template ? [String(template.type || '').replace(/^口语\s*/, ''), templateManager.promptFor(template)] : speakingPrompts[speakingIndex % speakingPrompts.length];
+  document.getElementById('speakingPart').textContent = p[0]; document.getElementById('speakingPrompt').textContent = p[1];
+  const sample = window.SpeakingExamples[speakingPrompts.findIndex(item => item[1] === p[1])];
+  document.getElementById('speakingExample').open = false;
+  document.getElementById('speakingExample').classList.toggle('hidden', !sample);
+  document.getElementById('speakingExampleText').textContent = sample?.[0] || '';
+  document.getElementById('speakingExampleMeaning').textContent = sample?.[1] || '';
+}
+function readLocalEnglish(text) {
+  if (!text.trim()) { toast('请先填写答案。'); return; }
+  if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) { toast('当前浏览器不支持朗读。'); return; }
+  const voice = speechSynthesis.getVoices().find(item => item.localService && /^en[-_]/i.test(item.lang));
+  if (!voice) { toast('本机暂未提供英语朗读，可先阅读示例。'); return; }
+  const utterance = new SpeechSynthesisUtterance(text); utterance.voice = voice; utterance.lang = voice.lang; utterance.rate = .9;
+  utterance.onerror = () => toast('朗读未完成，请检查设备声音。'); speechSynthesis.cancel(); speechSynthesis.speak(utterance);
+}
+document.getElementById('listenSpeakingExample').onclick = () => readLocalEnglish(document.getElementById('speakingExampleText').textContent);
+document.getElementById('nextPrompt').onclick = () => { if (recorder?.state === 'recording') { toast('请先停止录音。'); return; } activeSpeakingTemplate = null; speakingIndex++; renderSpeaking(); };
 let timerSeconds = 0, timerHandle = null;
 function timerText() { document.getElementById("speakingTimer").textContent = `${String(Math.floor(timerSeconds/60)).padStart(2,"0")}:${String(timerSeconds%60).padStart(2,"0")}`; }
 document.getElementById("timerButton").onclick = function() {
@@ -392,9 +411,10 @@ let recorder = null, recordChunks = [];
 document.getElementById("recordButton").onclick = async function() {
   if (recorder?.state === "recording") { recorder.stop(); return; }
   try {
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); recordChunks = [];
     recorder = new MediaRecorder(stream); recorder.ondataavailable = e => recordChunks.push(e.data);
-    recorder.onstop = () => { const blob = new Blob(recordChunks, { type: recorder.mimeType }); document.getElementById("recordingPlayback").src = URL.createObjectURL(blob); stream.getTracks().forEach(t => t.stop()); this.classList.remove("recording"); this.textContent = "● 再录一遍"; document.getElementById("recordStatus").textContent = "录音已完成。请回听，找出停顿、语法和发音问题。"; };
+    recorder.onstop = () => { const blob = new Blob(recordChunks, { type: recorder.mimeType }); const player = document.getElementById('recordingPlayback'); if (player.src.startsWith('blob:')) URL.revokeObjectURL(player.src); player.src = URL.createObjectURL(blob); stream.getTracks().forEach(t => t.stop()); this.classList.remove("recording"); this.textContent = "● 再录一遍"; document.getElementById("recordStatus").textContent = "录音已完成，可回放或再录一遍。"; };
     recorder.start(); this.classList.add("recording"); this.textContent = "■ 停止录音";
   } catch { toast("需要允许网站使用麦克风"); }
 };
@@ -403,19 +423,16 @@ let writingIndex = 0;
 function renderWriting() { const p = writingPrompts[writingIndex % writingPrompts.length]; document.getElementById("writingType").textContent = p[0]; document.getElementById("writingPrompt").textContent = p[1]; }
 document.getElementById("nextWriting").onclick = () => { writingIndex++; renderWriting(); };
 
-let selectedTemplate = state.templates[0]?.id;
-function selected() { return state.templates.find(t => t.id === selectedTemplate) || state.templates[0]; }
-function renderTemplates() {
-  const list = document.getElementById("templateList"); list.innerHTML = "";
-  state.templates.forEach(t => { const b = document.createElement("button"); b.className = `template-item ${t.id === selectedTemplate ? "active" : ""}`; b.innerHTML = `<strong>${t.title || "未命名模板"}</strong><small>${t.type} · ${t.review === "good" ? "可脱稿" : t.review === "hard" ? "需加强" : "待学习"}</small>`; b.onclick = () => { selectedTemplate = t.id; renderTemplates(); fillTemplate(); }; list.appendChild(b); });
-}
-function fillTemplate() { const t = selected(); if (!t) return; document.getElementById("templateType").value = t.type; document.getElementById("templateTitle").value = t.title; document.getElementById("templateKeywords").value = t.keywords; document.getElementById("templateStructure").value = t.structure; document.getElementById("templateChunks").value = t.chunks; document.getElementById("templateAnswer").value = t.answer; }
-document.getElementById("newTemplate").onclick = () => { const t = { id: `t-${Date.now()}`, type: "口语 Part 1", title: "", keywords: "", structure: "直接回答 → 理由 → 例子", chunks: "", answer: "", review: "new" }; state.templates.unshift(t); selectedTemplate = t.id; saveState(); renderTemplates(); fillTemplate(); document.getElementById("templateTitle").focus(); };
-document.getElementById("saveTemplate").onclick = () => { const t = selected(); if (!t) return; t.type = document.getElementById("templateType").value; t.title = document.getElementById("templateTitle").value.trim() || "未命名模板"; t.keywords = document.getElementById("templateKeywords").value.trim(); t.structure = document.getElementById("templateStructure").value.trim(); t.chunks = document.getElementById("templateChunks").value.trim(); t.answer = document.getElementById("templateAnswer").value.trim(); saveState(); renderTemplates(); toast("模板已保存"); };
-function openMemory() { const t = selected(); if (!t) return; document.getElementById("memoryType").textContent = t.type; document.getElementById("memoryTitle").textContent = t.title; document.getElementById("memoryKeywords").textContent = t.keywords || "暂无关键词"; document.getElementById("memoryStructure").textContent = t.structure; document.getElementById("memoryAnswer").textContent = `${t.chunks}\n\n${t.answer}`; document.getElementById("memoryAnswer").classList.add("hidden"); document.getElementById("memoryRatings").classList.add("hidden"); document.getElementById("revealMemory").classList.remove("hidden"); document.getElementById("memoryOverlay").classList.remove("hidden"); }
-document.getElementById("memoryMode").onclick = openMemory; document.getElementById("practiceTemplate").onclick = openMemory; document.getElementById("closeMemory").onclick = () => document.getElementById("memoryOverlay").classList.add("hidden");
-document.getElementById("revealMemory").onclick = () => { document.getElementById("memoryAnswer").classList.remove("hidden"); document.getElementById("memoryRatings").classList.remove("hidden"); document.getElementById("revealMemory").classList.add("hidden"); };
-document.querySelectorAll("[data-memory]").forEach(btn => btn.onclick = () => { const t = selected(); t.review = btn.dataset.memory; t.lastReview = todayKey(); state.templatesPracticed++; saveState(); document.getElementById("memoryOverlay").classList.add("hidden"); renderTemplates(); renderProgress(); toast("背诵结果已记录"); });
+const templateManager = window.createTemplateManager({ state, saveState, todayKey, toast, renderProgress,
+  promptFor: template => template.prompt || ({ 't-home': speakingPrompts[2][1], 't-study': speakingPrompts[1][1] }[template.id]) || template.title || '',
+  onPractice: template => {
+    if (recorder?.state === 'recording') { toast('请先停止录音。'); return false; }
+    activeSpeakingTemplate = template.id; renderSpeaking(template); showView('speaking');
+    document.querySelector('.speaking-card').scrollIntoView({ block: 'start', behavior: 'smooth' }); return true;
+  },
+  getPractice: () => ({ id: activeSpeakingTemplate, type: '口语 ' + document.getElementById('speakingPart').textContent, prompt: document.getElementById('speakingPrompt').textContent }),
+  readAloud: readLocalEnglish
+});
 
 function renderProgress() {
   const completedDays = Object.values(state.completions).filter(d => Object.values(d).filter(Boolean).length > 0).length;
@@ -452,4 +469,4 @@ if ("serviceWorker" in navigator) window.addEventListener("load", () => navigato
 if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
 direction = state.wordDirection === "zh-en" ? "zh-en" : "en-zh";
 document.querySelectorAll("[data-direction]").forEach(button => button.classList.toggle("active", button.dataset.direction === direction));
-renderToday(); initializeWords(); initSpelling(); renderSpeaking(); renderWriting(); renderTemplates(); fillTemplate(); renderProgress();
+renderToday(); initializeWords(); initSpelling(); renderSpeaking(); renderWriting(); templateManager.render(); renderProgress();

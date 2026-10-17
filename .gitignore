@@ -1,5 +1,6 @@
 free-version-*.png
 qa-handwriting/
+outputs/
 .env
 .env.*
 !.env.example
