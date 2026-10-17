@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#234e4a">
-  <meta name="app-version" content="words-20261017-a">
+  <meta name="app-version" content="words-20261017-b">
   <meta name="description" content="为平板手写设计的三个月雅思学习台">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23152b4f'/%3E%3Cpath d='M17 45l7-19 6 14 7-25 10 30' fill='none' stroke='%23f0b75b' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <title>90天雅思手写学习台</title>
-  <link rel="stylesheet" href="./styles.css?v=1017A">
+  <link rel="stylesheet" href="./styles.css?v=1017B">
 </head>
 <body>
   <div class="app-shell">
@@ -22,7 +22,6 @@
         <span>总分 6.5</span>
         <span>口语 6+</span>
         <span>听/读一项冲高</span>
-        <span class="privacy-chip">手写练习 · 自动保存</span>
       </div>
     </header>
 
@@ -86,7 +85,6 @@
         </div>
         <article class="panel word-session-complete hidden" id="wordSessionComplete" role="status">
           <h3 id="wordCompleteTitle">本次练习完成</h3><p id="wordCompleteDetail"></p>
-          <p class="muted">本次答对不等于永久掌握，之后仍需间隔复习。</p>
           <button class="secondary" id="newWordSession">再练一组 30 词</button>
         </article>
         <div class="two-col" id="wordPracticeGrid">
@@ -94,7 +92,6 @@
             <div class="word-meta"><span id="wordProgress">今日 0 / 30</span><span id="wordDue">待复习 0</span></div>
             <div class="word-prompt" id="wordPrompt">environment</div>
             <button class="icon-button" id="speakWord" aria-label="播放发音">🔊 听发音</button>
-            <p class="answer-instruction">独立输入完整答案，点「提交核对」。系统判断后显示释义、搭配和例句；答错再记录错因。</p>
             <div class="answer-box hidden" id="wordAnswer">
               <strong id="wordMeaning">环境</strong>
               <p id="wordCollocation">protect the environment · 保护环境</p>
@@ -105,7 +102,6 @@
         </div>
         <article class="panel wordbook-panel hidden" id="wordBookPanel">
           <div class="wordbook-heading"><h3>错词本</h3><span id="wordBookSummary">未掌握 0 词</span></div>
-          <p class="muted">曾经错过的词都保留在这里；橙色标记“完全不会”，本次答对后仍可回来复习。进入错词本即可默写。</p>
           <details id="wordBookCatalog"><summary>查看错词列表</summary><div id="wordBookList" class="wordbook-list"></div></details>
         </article>
         <article class="panel import-card">
@@ -313,17 +309,17 @@
       </section>
     </main>
 
-    <footer class="study-footer"><span>每天一点积累，让进步看得见。</span><small>单词更新 · 10.17A</small></footer>
+    <footer class="study-footer"><span>每天一点积累，让进步看得见。</span><small>单词更新 · 10.17B</small></footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
   <script src="./spelling-data.js"></script>
-  <script src="./local-grader.js?v=1017A"></script>
+  <script src="./local-grader.js?v=1017B"></script>
   <script src="./free-grader.js"></script>
   <script src="./handwriting.js"></script>
   <script src="./word-rounds.js?v=1016B"></script>
-  <script src="./word-practice.js?v=1017A"></script>
-  <script src="./word-answers.js?v=1017A"></script>
-  <script src="./app.js?v=1017A"></script>
+  <script src="./word-practice.js?v=1017B"></script>
+  <script src="./word-answers.js?v=1017B"></script>
+  <script src="./app.js?v=1017B"></script>
 </body>
 </html>

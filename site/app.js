@@ -215,8 +215,8 @@ async function refreshWordBook() {
     for (const entry of wordBook) {
       const card = document.createElement('article'); card.className = `wordbook-item${entry.fullyUnknown ? ' fully-unknown' : ''}`;
       const title = document.createElement('h4'), badge = document.createElement('span'), meaning = document.createElement('p'), detail = document.createElement('p');
-      title.textContent = entry.word[0]; badge.className = 'wordbook-badge'; badge.textContent = entry.fullyUnknown ? '完全不会' : entry.status === 'correct' ? '本次已答对' : entry.status === 'uncertain' ? '释义待核实' : '需要巩固';
-      meaning.textContent = entry.word[1]; detail.className = 'muted'; detail.textContent = `错因：${entry.reasons.join('、') || '待核实'} · 错误记录 ${entry.mistakes} 次`;
+      title.textContent = entry.word[0]; badge.className = 'wordbook-badge'; badge.textContent = entry.fullyUnknown ? '完全不会' : entry.status === 'correct' ? '本次已答对' : '需要复习';
+      meaning.textContent = entry.word[1]; detail.className = 'muted'; detail.textContent = `${entry.reasons.length ? entry.reasons.join('、') + ' · ' : ''}答错 ${entry.mistakes} 次`;
       card.append(title, badge, meaning, detail); list.append(card);
     }
   } catch { toast('错词本暂未读取成功，请稍后重试。原记录没有清除。'); throw new Error('Wordbook unavailable'); }

@@ -6,7 +6,7 @@ const handlers = {}, deleted = [];
 const context = vm.createContext({
   self: { location: { origin: 'https://study.test' }, addEventListener: (name, action) => handlers[name] = action, clients: { claim() {} } },
   caches: {
-    keys: async () => ['ielts-handwrite-free-v4', 'ielts-handwrite-local-ocr-v9', 'ielts-handwrite-words-v10', 'ielts-handwrite-words-v11', 'ielts-handwrite-words-v12', 'other-study-app', 'ielts-ocr-models-v1'],
+    keys: async () => ['ielts-handwrite-free-v4', 'ielts-handwrite-local-ocr-v9', 'ielts-handwrite-words-v10', 'ielts-handwrite-words-v11', 'ielts-handwrite-words-v12', 'ielts-handwrite-words-v13', 'other-study-app', 'ielts-ocr-models-v1'],
     delete: async key => deleted.push(key),
     match: async () => undefined
   },
@@ -15,7 +15,7 @@ const context = vm.createContext({
 vm.runInContext(await readFile(new URL('../site/sw.js', import.meta.url), 'utf8'), context);
 let operation;
 handlers.activate({ waitUntil: promise => operation = promise }); await operation;
-assert.deepEqual(deleted, ['ielts-handwrite-free-v4', 'ielts-handwrite-local-ocr-v9', 'ielts-handwrite-words-v10', 'ielts-handwrite-words-v11'], 'Do not clear another app cache on the same GitHub Pages origin');
+assert.deepEqual(deleted, ['ielts-handwrite-free-v4', 'ielts-handwrite-local-ocr-v9', 'ielts-handwrite-words-v10', 'ielts-handwrite-words-v11', 'ielts-handwrite-words-v12'], 'Do not clear another app cache on the same GitHub Pages origin');
 let response;
 handlers.fetch({ request: new Request('https://study.test/missing.js'), respondWith: promise => response = promise });
 assert.equal((await response).type, 'error', 'An unavailable model must not receive HTML as if it were a model');

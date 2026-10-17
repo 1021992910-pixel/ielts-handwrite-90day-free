@@ -43,9 +43,9 @@
       }
       const fallback = question.kind === 'meaning' ? [wordKey, question.expected?.join('；') || attempt.expected || '', '', ''] : [question.expected?.[0] || wordKey, question.prompt || '', '', ''];
       const entry = records.get(wordKey) || { key: wordKey, word: clone(dictionary.get(wordKey) || fallback), mistakes: 0 };
-      entry.open = true; entry.mistakes += attempt.status === 'wrong' ? 1 : 0;
+      entry.open = true; entry.mistakes += 1;
       entry.fullyUnknown = Boolean(attempt.unknown || attempt.reasons?.includes('完全不会'));
-      entry.status = attempt.status; entry.reasons = attempt.reasons || []; entry.answer = attempt.answer ?? attempt.recognized ?? '';
+      entry.status = 'wrong'; entry.reasons = attempt.reasons || []; entry.answer = attempt.answer ?? attempt.recognized ?? '';
       entry.updatedAt = attempt.createdAt; records.set(wordKey, entry);
     }
     return [...records.values()].sort((a, b) => Number(b.fullyUnknown) - Number(a.fullyUnknown) || Number(b.open) - Number(a.open) || String(b.updatedAt).localeCompare(String(a.updatedAt)));

@@ -52,6 +52,9 @@ try {
     ]);
   });
   await page.reload(); await settled(); await page.locator('[data-view=words]').click();
+  assert.equal(await workspace().locator('#wordInputHint, [data-draft-status], .submission-note, .answer-steps, [data-explanation]').count(), 0);
+  assert.equal(await page.locator('#view-words .answer-instruction').count(), 0);
+  assert.doesNotMatch(await workspace().innerText(), /字母提示|自动保存|无需自行判分|不强行判错|待核实/);
   assert.equal(await workspace().locator('canvas').count(), 0);
   assert.equal(await workspace().locator('textarea').getAttribute('autocorrect'), 'off');
   assert.equal(await workspace().locator('textarea').getAttribute('spellcheck'), 'false');
@@ -81,6 +84,8 @@ try {
   assert.equal(await workspace().locator('[data-edit], [data-dispute], [data-skip]').count(), 0);
   assert.equal(await workspace().locator('.error-reasons small').count(), 0);
   assert.equal(await workspace().getByLabel('完全不会', { exact: true }).count(), 1);
+  assert.deepEqual(await workspace().locator('.reason-number').allTextContents(), ['1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.']);
+  assert.match(await workspace().locator('.grade-title').innerText(), /答错了/);
   const submittedAttempt = await page.evaluate(() => document.querySelector('#wordWorkspace').attempt.id);
   await page.evaluate(() => {
     const workspace = document.querySelector('#wordWorkspace');
@@ -110,14 +115,27 @@ try {
   await workspace().locator('[data-next]').click(); await page.waitForFunction(() => state.wordReviewed === 10); await settled();
   assert.deepEqual(await page.evaluate(() => state.wordStats.different.reasons), ['完全不会']);
   await select('different'); await workspace().locator('[data-clear]').click();
-  await submit('独具一格', 'uncertain');
+  await submit('独具一格', 'wrong');
+  assert.equal(await workspace().locator('[data-expected]').innerText(), '不同的');
+  // Simulate an old pending unlisted meaning. It must resume locked as wrong,
+  // offer the same numbered reasons and count into the weak-only session.
+  await page.evaluate(async () => {
+    const component = document.querySelector('#wordWorkspace');
+    await HandwritingNotebook.put(`attempt:${component.attempt.id}`, { ...component.attempt, status: 'uncertain' });
+  });
+  await page.reload(); await settled(); await page.locator('[data-view=words]').click();
+  await workspace().locator('.grade-result.wrong').waitFor();
+  assert.equal(await workspace().locator('textarea').inputValue(), '独具一格');
+  assert.equal(await workspace().locator('textarea').getAttribute('readonly'), '');
+  assert.doesNotMatch(await workspace().innerText(), /待核实|不能判断|暂不计/);
   assert.equal(await workspace().locator('[data-next]').isVisible(), true);
+  await workspace().getByLabel('没记住词义', { exact: true }).check();
   await workspace().locator('[data-next]').click(); await settled();
-  assert.equal(await page.evaluate(() => state.wordReviewed), 10, 'Unknown meanings remain unscored without offering a retry');
+  assert.equal(await page.evaluate(() => state.wordReviewed), 11, 'Unlisted meanings count as wrong without offering a retry');
   await select('improve', 'zh-en'); await workspace().locator('[data-unknown]').click();
   await workspace().locator('.grade-result.wrong').waitFor(); await settled();
   assert.equal(await workspace().getByLabel('完全不会', { exact: true }).isChecked(), true);
-  await workspace().locator('[data-next]').click(); await page.waitForFunction(() => state.wordReviewed === 11); await settled();
+  await workspace().locator('[data-next]').click(); await page.waitForFunction(() => state.wordReviewed === 12); await settled();
   await select('different'); await workspace().locator('[data-clear]').click(); await submit('不一样', 'correct');
   await workspace().locator('.answer-history > summary').click();
   const legacy = workspace().locator('.history-item').filter({ hasText: '旧版记录' });
@@ -136,7 +154,7 @@ try {
   assert.ok(parsed.notebook.some(([key, value]) => key.startsWith('attempt:') && value.inputMode === 'typed' && value.reasons?.includes('漏写或多写字母')));
   await page.locator('#importData').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(backup) });
   await page.waitForEvent('load'); await settled();
-  assert.equal(await page.evaluate(() => state.wordReviewed), 11);
+  assert.equal(await page.evaluate(() => state.wordReviewed), 12);
   await page.locator('[data-view=words]').click();
   await page.setViewportSize({ width: 820, height: 1180 });
   await page.screenshot({ path: fileURLToPath(new URL(`words-${browserName}-portrait.png`, output)), fullPage: true });
@@ -147,5 +165,5 @@ try {
   assert.ok(await page.locator('#spellingWorkspace canvas').isVisible(), 'Other modules keep their original component');
   assert.deepEqual(forbidden, [], 'Words do not request an OCR model, upload answers, or call APIs');
   assert.deepEqual(errors, []);
-  console.log(`Typed words ${browserName} passed: compact two-row comparison, fully-unknown reason, one Next button, immutable submitted answers after reload, unscored unknown meanings, original data, backup/import, old ink history, mobile layouts and no OCR/API requests.`);
+  console.log(`Typed words ${browserName} passed: minimal copy, numbered multi-select reasons, binary grading including unlisted meanings and old pending results, immutable answers, original data, backup/import, old ink, mobile layouts and no OCR/API requests.`);
 } finally { await browser.close(); }

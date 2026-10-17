@@ -34,5 +34,6 @@ history('word0', 'wrong', ['完全不会']); history('word1', 'wrong', ['输入�
 let book = practice.book(records, words); assert.equal(book.length, 2); assert.equal(book[0].fullyUnknown, true); assert.equal(book[0].mistakes, 2);
 history('word0', 'correct', [], false); assert.equal(practice.book(records, words).length, 2, 'An unfinished correct attempt is not yet removed');
 history('word0', 'correct'); book = practice.book(records, words); assert.equal(book.length, 2); assert.equal(book.find(item => item.key === 'word0').open, false); assert.equal(book.find(item => item.key === 'word0').fullyUnknown, false);
-history('word1', 'uncertain'); assert.equal(practice.book(records, words).find(item => item.key === 'word1').status, 'uncertain');
+history('word1', 'uncertain'); assert.equal(practice.book(records, words).find(item => item.key === 'word1').status, 'wrong');
+assert.equal(practice.book(records, words).find(item => item.key === 'word1').mistakes, 2, 'Legacy uncertain records are included in the wrong-word list');
 console.log('Finite practice and wordbook passed: 30 unique words, automatic weak-only rounds, stop after all correct, persistence, idempotence, uncertain answers and unified fully-unknown records.');

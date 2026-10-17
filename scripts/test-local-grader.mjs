@@ -29,7 +29,7 @@ console.log("Local grader tests passed");
 const typed = (q, answer) => grader.gradeTyped(q, answer);
 for (const answer of ['不同', '不同的', '不一样', '不同；不一样']) assert.equal(typed(question, answer).status, 'correct', answer);
 for (const answer of ['教育', '不同；教育', '不知道']) assert.equal(typed(question, answer).status, 'wrong', answer);
-for (const answer of ['独具一格', '不同；尚未收录的意思', '不重要']) assert.equal(typed(question, answer).status, 'uncertain', answer);
+for (const answer of ['独具一格', '不同；尚未收录的意思', '不重要']) assert.equal(typed(question, answer).status, 'wrong', answer);
 assert.equal(typed({ kind: 'meaning', prompt: 'custom', expected: ['自定义释义'] }, '自定义释义').status, 'correct');
 assert.equal(typed(question, '   ').status, 'empty');
 assert.equal(typed(question, 'a'.repeat(201)).status, 'empty');

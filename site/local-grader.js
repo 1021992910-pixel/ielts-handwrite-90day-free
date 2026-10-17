@@ -80,11 +80,7 @@
     const accepted = value => matchesAny(value, expected);
     if (parts.length && parts.every(accepted)) return { status: 'correct', recognized, explanation: '意思正确：接受本题已收录的合理同义表达，不要求与参考释义逐字相同。' };
     if (/^(不知道|不会|不记得|忘记了|忘了|没记住)$/u.test(recognized)) return { status: 'wrong', recognized, explanation: '已记录为需要复习。先看本题释义与例句，再记录错因。' };
-    const unknown = parts.filter(value => !accepted(value));
-    const clearlyDifferent = unknown.length && unknown.every(value => Object.entries(meaningAliases).some(([word, aliases]) => word !== key && matchesAny(value, aliases)));
-    return { status: clearlyDifferent ? 'wrong' : 'uncertain', recognized, explanation: clearlyDifferent
-      ? '答案中有与本题已收录词义不一致的内容。请对照释义和例句，记录错因。'
-      : '这个表达尚未收录，当前无法可靠判断，已保留待核实。' };
+    return { status: 'wrong', recognized, explanation: '答案与本题收录的词义不符。' };
   }
   function wordErrorReasons(kind) {
     return kind === 'spelling'

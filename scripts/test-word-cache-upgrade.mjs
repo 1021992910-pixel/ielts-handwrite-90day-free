@@ -8,8 +8,8 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const playwright = require('C:/Users/10219/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const root = fileURLToPath(new URL('../', import.meta.url)), site = resolve(root, 'site');
-const baseline = process.env.WORDS_UPGRADE_FROM || '830ac8a';
-const oldFiles = new Set(['index.html', 'sw.js', 'local-grader.js', 'app.js', 'styles.css', ...(baseline === '2d8a624' ? [] : ['word-answers.js'])]);
+const baseline = process.env.WORDS_UPGRADE_FROM || '48ed09f';
+const oldFiles = new Set(['index.html', 'sw.js', 'local-grader.js', 'app.js', 'styles.css', ...(baseline === '2d8a624' ? [] : ['word-answers.js']), ...(baseline === '48ed09f' ? ['word-practice.js'] : [])]);
 const snapshot = new Map([...oldFiles].map(file => [file, execFileSync('git', ['show', `${baseline}:site/${file}`], { cwd: root })]));
 const oldCache = snapshot.get('sw.js').toString().match(/const CACHE = "([^"]+)"/)[1];
 const pendingAnswer = process.env.WORDS_UPGRADE_PENDING === '1';
@@ -38,7 +38,15 @@ try {
     const workspace = document.querySelector('#wordWorkspace');
     return navigator.serviceWorker.controller && (workspace.pad ? !workspace.pad.loading : workspace.question && !workspace.busy);
   });
-  await page.evaluate(() => { state.activeWord = 'different'; state.wordDirection = 'en-zh'; state.wordReviewed = 17; saveState(); });
+  await page.evaluate(() => {
+    state.activeWord = 'different'; state.wordDirection = 'en-zh'; state.wordReviewed = 17;
+    if (window.WordPractice) {
+      direction = 'en-zh'; wordSource = 'daily';
+      state.wordSessions[sessionKey()] = WordPractice.create(words(), { id: crypto.randomUUID(), day: todayKey(), direction, preferred: 'different', random: false });
+      nextWord();
+    }
+    saveState();
+  });
   if (pendingAnswer) {
     await page.evaluate(() => nextWord('different'));
     await page.waitForFunction(() => !document.querySelector('#wordWorkspace').busy);
@@ -51,7 +59,7 @@ try {
   }
   oldVersion = false;
   // Old cache controls this navigation; versioned scripts must still load the new grader.
-  await page.goto(`${url}index.html?v=1017A`);
+  await page.goto(`${url}index.html?v=1017B`);
   await page.waitForFunction(() => document.querySelector('#wordWorkspace')?.input && !document.querySelector('#wordWorkspace').busy);
   await page.locator('[data-view=words]').click();
   assert.equal(await page.evaluate(() => state.wordReviewed), 17);
@@ -66,8 +74,8 @@ try {
     await page.locator('#wordWorkspace .grade-result.correct').waitFor();
   }
   await page.waitForFunction(async () => {
-    const cache = await caches.open('ielts-handwrite-words-v12');
-    return Boolean(await cache.match('./word-answers.js?v=1017A'));
+    const cache = await caches.open('ielts-handwrite-words-v13');
+    return Boolean(await cache.match('./word-answers.js?v=1017B'));
   });
   if (browserName === 'chromium') {
     await context.setOffline(true);

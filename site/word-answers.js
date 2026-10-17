@@ -5,18 +5,14 @@
     connectedCallback() {
       if (this.input) return;
       this.innerHTML = `<div class="answer-workspace typed-workspace">
-        <div class="answer-steps"><span>① 输入答案</span><span>② 提交核对</span><span>③ 记录错因</span></div>
         <article class="panel typed-answer-panel"><label class="typed-label" for="typedWordAnswer">输入答案</label>
-          <p class="muted" id="wordInputHint">独立输入完整答案，提交后再查看释义与解析。</p>
-          <textarea id="typedWordAnswer" rows="3" maxlength="200" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" aria-describedby="wordInputHint"></textarea>
-          <div class="typed-input-footer"><span data-draft-status role="status">正在读取本题草稿…</span><button class="text-button" data-clear type="button">清空输入</button></div>
-          <div class="submission-bar"><span class="submission-note">提交后由系统核对，无需自行判分。</span><button class="primary" data-submit type="button">提交核对</button></div>
-          <button class="text-button" data-unknown type="button">暂时不会，查看答案并记录复习</button>
+          <textarea id="typedWordAnswer" rows="3" maxlength="200" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="done"></textarea>
+          <div class="typed-input-footer"><button class="text-button" data-clear type="button">清空</button></div>
+          <div class="submission-bar"><button class="primary" data-submit type="button">提交核对</button><button class="text-button" data-unknown type="button">完全不会</button></div>
         </article>
         <p class="submission-error hidden" role="alert"></p>
         <section class="grade-result hidden" role="status" aria-live="polite"><strong class="grade-title"></strong>
           <dl><div><dt>我的答案</dt><dd data-recognized></dd></div><div><dt>参考答案</dt><dd data-expected></dd></div></dl>
-          <p data-explanation></p>
           <fieldset class="error-reasons hidden"><legend>错在哪里？可多选</legend><div class="reason-options"></div></fieldset>
           <div class="grade-actions"><button class="primary" data-next type="button">下一题</button></div>
         </section>
@@ -58,10 +54,9 @@
       if (!this.question) return Promise.resolve();
       const key = this.draftKey(), generation = this.generation;
       const draft = { answer: this.input.value, attemptId: this.attempt?.id || null, updatedAt: new Date().toISOString() };
-      this.querySelector('[data-draft-status]').textContent = '正在保存…';
       this.savePromise = this.savePromise.catch(() => {}).then(() => notebook.put(key, draft));
-      this.savePromise.then(() => { if (generation === this.generation) this.querySelector('[data-draft-status]').textContent = '本题输入已保存在此设备'; }, () => {
-        if (generation === this.generation) { this.querySelector('[data-draft-status]').textContent = '尚未保存'; this.error('本题输入未保存成功，请勿关闭页面，可稍后重新提交。'); }
+      this.savePromise.catch(() => {
+        if (generation === this.generation) this.error('保存失败，请勿关闭页面。');
       });
       return this.savePromise;
     }
@@ -70,9 +65,7 @@
       this.question = copy(question); this.attempt = null; this.input.value = ''; this.revision = 0;
       this.hideResult(); this.setBusy(true);
       this.querySelector('.typed-label').textContent = question.kind === 'meaning' ? '输入中文意思' : '输入英文单词';
-      this.input.placeholder = question.kind === 'meaning' ? '输入您理解的中文意思' : '输入完整英文单词';
       this.input.lang = question.kind === 'meaning' ? 'zh-CN' : 'en';
-      this.querySelector('#wordInputHint').textContent = question.kind === 'meaning' ? '支持已收录的同义释义；未收录表达会待核实，不强行判错。' : '独立输入完整英文；不提供字母提示，不自动纠正拼写。';
       this.querySelector('.legacy-word-draft').classList.add('hidden');
       try {
         await this.savePromise.catch(() => {});
@@ -85,6 +78,9 @@
           if (generation !== this.generation) return;
           if (attempt && !attempt.counted && !attempt.skipped && attempt.question.id === question.id && attempt.inputMode === 'typed') {
             attempt.question = copy(question);
+            // Resume an old pending typed result using the current binary policy.
+            // Completed history is kept intact; the original answer remains locked.
+            if (attempt.status === 'uncertain') attempt.status = 'wrong';
             this.attempt = attempt; this.renderResult();
             this.dispatchEvent(new CustomEvent('answer-graded', { bubbles: true, detail: { question, status: attempt.status } }));
           }
@@ -92,7 +88,6 @@
         if (Array.isArray(legacy) && legacy.length) {
           const section = this.querySelector('.legacy-word-draft'); section.classList.remove('hidden'); section.querySelector('div').replaceChildren(this.legacyImage(legacy));
         }
-        this.querySelector('[data-draft-status]').textContent = draft?.answer ? '已恢复本题输入' : '输入会自动保存在此设备';
       } catch { if (generation === this.generation) this.error('未能读取本题记录，请检查浏览器存储权限。旧记录没有被清除。'); }
       finally { if (generation === this.generation) { this.setBusy(false); this.renderHistory(); } }
     }
@@ -116,26 +111,24 @@
     }
     renderResult() {
       const attempt = this.attempt, root = this.querySelector('.grade-result');
-      root.className = `grade-result ${attempt.status}`;
+      const correct = attempt.status === 'correct';
+      root.className = `grade-result ${correct ? 'correct' : 'wrong'}`;
       this.querySelector('.typed-answer-panel').classList.add('hidden');
-      root.querySelector('.grade-title').textContent = { correct: '✓ 本题答对了', wrong: '本题需要复习', uncertain: '释义待核实' }[attempt.status];
+      root.querySelector('.grade-title').textContent = correct ? '✓ 答对了' : '✕ 答错了';
       root.querySelector('[data-recognized]').textContent = attempt.unknown ? '完全不会' : attempt.answer || attempt.recognized;
       root.querySelector('[data-expected]').textContent = attempt.expected;
-      root.querySelector('[data-explanation]').textContent = attempt.unknown ? '本次记录为完全不会。'
-        : attempt.status === 'uncertain' ? '这个释义尚未收录，已保留待核实。'
-        : attempt.status === 'correct' ? '' : attempt.question.kind === 'spelling' ? '请核对标色字母。' : '请对照参考词义。';
-      root.querySelector('[data-explanation]').classList.toggle('hidden', attempt.status === 'correct');
-      root.querySelector('.error-reasons').classList.toggle('hidden', attempt.status !== 'wrong');
+      root.querySelector('.error-reasons').classList.toggle('hidden', correct);
       const options = root.querySelector('.reason-options'); options.replaceChildren();
-      for (const reason of window.LocalGrader.wordErrorReasons(attempt.question.kind)) {
+      for (const [index, reason] of window.LocalGrader.wordErrorReasons(attempt.question.kind).entries()) {
         const label = document.createElement('label'), input = document.createElement('input');
-        input.type = 'checkbox'; input.value = reason; input.checked = attempt.reasons.includes(reason);
+        input.type = 'checkbox'; input.value = reason; input.setAttribute('aria-label', reason); input.checked = attempt.reasons.includes(reason);
         input.onchange = () => {
           attempt.reasons = [...options.querySelectorAll('input:checked')].map(element => element.value);
           this.error(); this.savePromise = this.savePromise.catch(() => {}).then(() => notebook.put(`attempt:${attempt.id}`, copy(attempt)));
           this.savePromise.then(() => this.renderHistory(), () => this.error('错因尚未保存，请稍后重试。'));
         };
-        label.append(input, document.createTextNode(reason)); options.append(label);
+        const number = document.createElement('span'); number.className = 'reason-number'; number.setAttribute('aria-hidden', 'true'); number.textContent = `${index + 1}.`;
+        label.append(input, number, document.createTextNode(reason)); options.append(label);
       }
       const diff = attempt.diff;
       root.querySelectorAll('dd').forEach(line => line.classList.toggle('answer-spelling', attempt.question.kind === 'spelling' && !attempt.unknown));
@@ -150,18 +143,18 @@
       this.queueDraft(); this.input.focus();
     }
     async finish() {
-      const attempt = this.attempt, skip = attempt?.status === 'uncertain';
+      const attempt = this.attempt;
       if (this.busy || !attempt || attempt.counted || attempt.skipped) return;
       if (attempt.status === 'wrong' && !attempt.reasons.length) { this.error('请选择错因，再点“下一题”。'); return; }
       const generation = this.generation, draftKey = this.draftKey(); this.setBusy(true); this.error();
       try {
-        await this.savePromise; const saved = { ...copy(attempt), counted: !skip, skipped: skip };
+        await this.savePromise; const saved = { ...copy(attempt), counted: true, skipped: false };
         await notebook.put(`attempt:${attempt.id}`, saved);
         try { await notebook.put(draftKey, { answer: '', attemptId: null }); }
         catch (error) { await notebook.put(`attempt:${attempt.id}`, attempt); throw error; }
         if (generation !== this.generation) return;
         Object.assign(attempt, saved);
-        this.dispatchEvent(new CustomEvent(skip ? 'answer-skipped' : 'answer-completed', { bubbles: true, detail: copy(attempt) }));
+        this.dispatchEvent(new CustomEvent('answer-completed', { bubbles: true, detail: copy(attempt) }));
       } catch { if (generation === this.generation) this.error('本题未完成保存，请重试。输入和旧记录不会清除。'); }
       finally { if (generation === this.generation) this.setBusy(false); }
     }
@@ -178,14 +171,14 @@
         const attempts = entries.filter(([key, value]) => key.startsWith('attempt:') && value?.question?.module === 'words').map(([, value]) => value).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
         this.querySelector('.history-count').textContent = String(attempts.length);
         const list = this.querySelector('.history-list'); list.replaceChildren();
-        if (!attempts.length) { const note = document.createElement('p'); note.className = 'muted'; note.textContent = '提交后的原答案、核对结果和错因会保留在这里。'; list.append(note); }
         this.historyLimit ||= 20;
         for (const attempt of attempts.slice(0, this.historyLimit)) {
           const item = document.createElement('details'); item.className = 'history-item';
-          const summary = document.createElement('summary'); summary.textContent = `${attempt.question.prompt} · ${{ correct: '答对', wrong: '需复习', uncertain: '待核实' }[attempt.status] || '待核实'} · ${new Date(attempt.createdAt).toLocaleString('zh-CN')}`;
+          const summary = document.createElement('summary'); summary.textContent = `${attempt.question.prompt} · ${attempt.status === 'correct' ? '答对' : '答错'} · ${new Date(attempt.createdAt).toLocaleString('zh-CN')}`;
           const body = document.createElement('div'), answer = document.createElement('p'), reasons = document.createElement('p');
-          answer.textContent = `${attempt.inputMode === 'typed' ? '输入答案' : '旧版识别'}：${attempt.unknown ? '暂时不会' : attempt.answer || attempt.recognized || '未识别'}；参考答案：${attempt.expected}`;
-          reasons.textContent = `错因：${(attempt.reasons || []).join('、') || '未记录'}。${attempt.explanation || ''}`;
+          answer.textContent = `${attempt.inputMode === 'typed' ? '输入答案' : '旧版识别'}：${attempt.unknown ? '完全不会' : attempt.answer || attempt.recognized || '未识别'}；参考答案：${attempt.expected}`;
+          reasons.textContent = `错因：${(attempt.reasons || []).join('、') || '未记录'}`;
+          if (attempt.inputMode !== 'typed' && attempt.status !== 'uncertain' && attempt.explanation) reasons.textContent += `。${attempt.explanation}`;
           body.append(answer, reasons); item.append(summary, body);
           if (attempt.inputMode !== 'typed' && attempt.strokes?.length) item.addEventListener('toggle', () => { if (item.open && !body.querySelector('img')) body.prepend(this.legacyImage(attempt.strokes)); });
           list.append(item);
