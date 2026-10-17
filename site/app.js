@@ -153,10 +153,34 @@ function renderToday() {
 }
 
 let direction = "en-zh", currentWord = null, wordToday = 0;
+let wordSource = state.wordPracticeSource === 'review' ? 'review' : 'daily', wordBook = [], bookRenderVersion = 0;
+let wordModeBusy = false;
+state.wordSessions ||= {};
 function words() { return [...new Map([...coreWords, ...state.customWords].map(word => [word[0].toLowerCase(), word])).values()]; }
+function sessionKey(source = wordSource, mode = direction) { return `${source}:${mode}`; }
+function wordSession() { return state.wordSessions[sessionKey()]; }
+function createWordSession(preferred, adoptLegacy = false) {
+  const all = wordSource === 'review' ? wordBook.map(entry => entry.word) : words();
+  const session = window.WordPractice.create(all, { id: crypto.randomUUID(), direction, source: wordSource, day: todayKey(), limit: wordSource === 'review' ? all.length : 30, preferred, adoptLegacy });
+  state.wordSessions[sessionKey()] = session; return session;
+}
 function nextWord(preferred = null) {
-  state.wordRounds ||= {};
-  currentWord = window.WordRounds.select(state.wordRounds, direction, words(), state.wordStats, todayKey(), preferred);
+  let session = wordSession();
+  if (!session?.id || !Array.isArray(session.items) || (wordSource === 'daily' && session.phase === 'done' && session.day !== todayKey())) session = createWordSession(preferred, !Object.keys(state.wordSessions).length);
+  state.wordPracticeSource = wordSource; state.wordDirection = direction;
+  document.querySelectorAll('[data-word-source]').forEach(button => button.classList.toggle('active', button.dataset.wordSource === wordSource));
+  document.getElementById('wordBookPanel').classList.toggle('hidden', wordSource !== 'review');
+  currentWord = window.WordPractice.current(session);
+  const done = !currentWord;
+  document.getElementById('wordPracticeGrid').classList.toggle('hidden', done);
+  document.getElementById('wordSessionComplete').classList.toggle('hidden', !done);
+  document.getElementById('newWordSession').classList.toggle('hidden', wordSource !== 'daily');
+  document.getElementById('wordBookCatalog').open = done;
+  if (done) {
+    document.getElementById('wordCompleteTitle').textContent = session.items.length ? '本次练习完成' : '错词本暂时没有待练词';
+    document.getElementById('wordCompleteDetail').textContent = session.items.length ? `本次 ${session.items.length} 个词均已独立答对，共完成 ${session.attempts} 次作答。` : '以后答错或选择“完全不会”的词，会自动收录在这里。';
+    saveState(); return;
+  }
   state.activeWord = currentWord[0]; state.wordDirection = direction; saveState();
   document.getElementById("wordPrompt").textContent = direction === "en-zh" ? currentWord[0] : currentWord[1];
   document.getElementById("wordMeaning").textContent = direction === "en-zh" ? currentWord[1] : currentWord[0];
@@ -167,39 +191,88 @@ function nextWord(preferred = null) {
     id: `${direction}:${currentWord[0].toLowerCase()}`, module: "words", kind: direction === "en-zh" ? "meaning" : "spelling",
     prompt: direction === "en-zh" ? currentWord[0] : currentWord[1],
     expected: direction === "en-zh" ? currentWord[1].split(/[；;,，、/]+/).filter(Boolean) : [currentWord[0]],
-    title: direction === "en-zh" ? "输入中文意思" : "输入英文单词"
+    title: direction === "en-zh" ? "输入中文意思" : "输入英文单词",
+    sessionId: session.id, sessionKey: sessionKey(), turnId: `${session.id}:${session.round}:${currentWord[0].toLowerCase()}`,
+    adoptLegacy: session.adoptLegacy && session.round === 1 && session.legacyWord === currentWord[0].toLowerCase()
   });
   renderWordMeta();
 }
 function renderWordMeta() {
-  const due = words().filter(w => !state.wordStats[w[0]] || !state.wordStats[w[0]].next || state.wordStats[w[0]].next <= todayKey()).length;
-  document.getElementById("wordProgress").textContent = `今日 ${wordToday} / 30`;
-  document.getElementById("wordDue").textContent = `待复习 ${due}`;
+  const session = wordSession(); if (!session) return;
+  document.getElementById("wordProgress").textContent = session.phase === 'first' ? `首轮 ${session.seen.length} / ${session.items.length}` : `巩固第 ${session.round - 1} 轮 · 剩余 ${session.pending.length} 词`;
+  document.getElementById("wordDue").textContent = `本次已答对 ${session.mastered.length} / ${session.items.length}`;
 }
+
+async function refreshWordBook() {
+  const version = ++bookRenderVersion;
+  try {
+    const entries = await window.HandwritingNotebook.export(); if (version !== bookRenderVersion) return;
+    wordBook = window.WordPractice.book(entries, words());
+    document.getElementById('wordBookCount').textContent = String(wordBook.length);
+    document.getElementById('wordBookSummary').textContent = `共 ${wordBook.length} 词 · 待巩固 ${wordBook.filter(entry => entry.open).length} 词`;
+    const list = document.getElementById('wordBookList'); list.replaceChildren();
+    if (!wordBook.length) { const empty = document.createElement('p'); empty.className = 'muted'; empty.textContent = '目前没有待练错词。原作答记录仍保留在“答题记录”中。'; list.append(empty); }
+    for (const entry of wordBook) {
+      const card = document.createElement('article'); card.className = `wordbook-item${entry.fullyUnknown ? ' fully-unknown' : ''}`;
+      const title = document.createElement('h4'), badge = document.createElement('span'), meaning = document.createElement('p'), detail = document.createElement('p');
+      title.textContent = entry.word[0]; badge.className = 'wordbook-badge'; badge.textContent = entry.fullyUnknown ? '完全不会' : entry.status === 'correct' ? '本次已答对' : entry.status === 'uncertain' ? '释义待核实' : '需要巩固';
+      meaning.textContent = entry.word[1]; detail.className = 'muted'; detail.textContent = `错因：${entry.reasons.join('、') || '待核实'} · 错误记录 ${entry.mistakes} 次`;
+      card.append(title, badge, meaning, detail); list.append(card);
+    }
+  } catch { toast('错词本暂未读取成功，请稍后重试。原记录没有清除。'); throw new Error('Wordbook unavailable'); }
+}
+function applyWordAttempt(attempt) {
+  const session = state.wordSessions[attempt.question.sessionKey || sessionKey()];
+  if (!window.WordPractice.record(session, attempt)) return false;
+  const word = attempt.question.id.slice(attempt.question.id.indexOf(':') + 1);
+  if (attempt.status !== 'uncertain') {
+    const correct = attempt.status === 'correct', next = new Date(); next.setDate(next.getDate() + (correct ? 4 : 1));
+    state.wordStats[word] = { rating: correct ? 3 : 0, next: next.toISOString().slice(0, 10), last: todayKey(), reasons: attempt.reasons };
+    state.wordReviewed++; wordToday++;
+  }
+  if (session.phase === 'done' && session.source === 'daily') dayRecord().words = true;
+  saveState(); return true;
+}
+async function initializeWords() {
+  try {
+    const entries = await window.HandwritingNotebook.export();
+    // Replay persisted completions after an interrupted save, once per attempt ID.
+    for (const [, attempt] of entries.filter(([key, value]) => key.startsWith('attempt:') && value?.question?.sessionId && (value.counted || value.skipped)).sort((a, b) => a[1].createdAt.localeCompare(b[1].createdAt))) applyWordAttempt(attempt);
+    await refreshWordBook(); nextWord(state.activeWord); window.WordPracticeReady = true;
+  } catch { toast('单词记录未能读取，请检查存储权限后刷新。'); }
+}
+document.querySelectorAll('[data-word-source]').forEach(button => button.onclick = async () => {
+  const workspace = document.getElementById('wordWorkspace');
+  if (wordModeBusy || workspace.busy || wordSource === button.dataset.wordSource && !(wordSource === 'review' && wordSession()?.phase === 'done')) return;
+  wordModeBusy = true;
+  try { await workspace.savePromise; await refreshWordBook(); }
+  catch { wordModeBusy = false; return; }
+  wordSource = button.dataset.wordSource;
+  if (wordSource === 'review') {
+    direction = 'zh-en';
+    const previous = wordSession();
+    const open = new Set(wordBook.map(entry => entry.key));
+    if (!previous || previous.phase === 'done' || [...previous.pending, ...previous.failed].some(key => !open.has(key)) || previous.attempts === 0 && wordBook.some(entry => !previous.items.some(word => word[0].toLowerCase() === entry.key))) createWordSession();
+  }
+  document.querySelectorAll('[data-direction]').forEach(item => item.classList.toggle('active', item.dataset.direction === direction)); nextWord();
+  wordModeBusy = false;
+});
+document.getElementById('newWordSession').onclick = () => { if (wordSource === 'daily' && wordSession()?.phase === 'done') { createWordSession(); nextWord(); } };
 document.querySelectorAll("[data-direction]").forEach(btn => btn.onclick = () => {
-  if (document.getElementById("wordWorkspace").busy) return;
+  if (wordModeBusy || document.getElementById("wordWorkspace").busy) return;
   if (direction === btn.dataset.direction) return;
   direction = btn.dataset.direction; document.querySelectorAll("[data-direction]").forEach(b => b.classList.toggle("active", b === btn)); nextWord();
 });
 document.getElementById("wordWorkspace").addEventListener("answer-graded", () => document.getElementById("wordAnswer").classList.remove("hidden"));
 document.getElementById("wordWorkspace").addEventListener("answer-invalidated", () => document.getElementById("wordAnswer").classList.add("hidden"));
-document.getElementById("wordWorkspace").addEventListener("answer-skipped", event => {
-  const question = event.detail.question, word = question.id.slice(question.id.indexOf(":") + 1), mode = question.kind === "meaning" ? "en-zh" : "zh-en";
-  window.WordRounds.complete(state.wordRounds, mode, word);
-  nextWord(); toast("本题已保留待核实");
-});
+document.getElementById("wordWorkspace").addEventListener("answer-skipped", event => { applyWordAttempt(event.detail); nextWord(); refreshWordBook().catch(() => {}); });
 document.getElementById("wordWorkspace").addEventListener("answer-repeat", event => {
   const question = event.detail; direction = question.kind === "meaning" ? "en-zh" : "zh-en";
   document.querySelectorAll("[data-direction]").forEach(button => button.classList.toggle("active", button.dataset.direction === direction));
   nextWord(question.id.slice(question.id.indexOf(":") + 1));
 });
 document.getElementById("wordWorkspace").addEventListener("answer-completed", event => {
-  const attempt = event.detail, word = attempt.question.id.slice(attempt.question.id.indexOf(":") + 1);
-  window.WordRounds.complete(state.wordRounds, attempt.question.kind === "meaning" ? "en-zh" : "zh-en", word);
-  const correct = attempt.status === "correct", next = new Date(); next.setDate(next.getDate() + (correct ? 4 : 1));
-  state.wordStats[word] = { rating: correct ? 3 : 0, next: next.toISOString().slice(0, 10), last: todayKey(), reasons: attempt.reasons };
-  state.wordReviewed++; wordToday++; if (wordToday >= 30) dayRecord().words = true;
-  saveState(); renderToday(); renderProgress(); nextWord();
+  applyWordAttempt(event.detail); renderToday(); renderProgress(); nextWord(); refreshWordBook().catch(() => {});
 });
 document.getElementById("speakWord").onclick = () => {
   if (!currentWord) return; const utter = new SpeechSynthesisUtterance(currentWord[0]); utter.lang = "en-GB"; speechSynthesis.cancel(); speechSynthesis.speak(utter);
@@ -379,4 +452,4 @@ if ("serviceWorker" in navigator) window.addEventListener("load", () => navigato
 if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
 direction = state.wordDirection === "zh-en" ? "zh-en" : "en-zh";
 document.querySelectorAll("[data-direction]").forEach(button => button.classList.toggle("active", button.dataset.direction === direction));
-renderToday(); nextWord(state.activeWord); initSpelling(); renderSpeaking(); renderWriting(); renderTemplates(); fillTemplate(); renderProgress();
+renderToday(); initializeWords(); initSpelling(); renderSpeaking(); renderWriting(); renderTemplates(); fillTemplate(); renderProgress();

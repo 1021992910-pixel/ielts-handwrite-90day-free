@@ -307,4 +307,18 @@ word-answer-workspace { display: block; min-width: 0; }
 .letter-missing { background: #d8f0de; color: #155c39; border-bottom: 2px solid #408461; }
 .legacy-word-draft { padding: 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
 .legacy-word-draft img { display: block; width: 100%; }
+.word-source-tabs { display: inline-flex; margin-bottom: 20px; gap: 5px; }
+.word-source-tabs button { min-height: 44px; }
+.word-source-tabs span { font-size: .85em; margin-left: 5px; }
+.word-session-complete { margin-bottom: 20px; border: 1px solid #b7d6c4; background: #f3faf5; }
+.wordbook-panel { margin-top: 20px; }
+.wordbook-heading { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; }
+.wordbook-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; }
+#wordBookCatalog .wordbook-list { margin-top: 12px; }
+.wordbook-item { padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: #fbfcfa; overflow-wrap: anywhere; }
+.wordbook-item h4 { display: inline; margin: 0 10px 0 0; color: var(--navy); font-size: 1.1rem; }
+.wordbook-item p { margin: 8px 0 0; }
+.wordbook-item.fully-unknown { border: 2px solid #d17d31; background: #fff1df; }
+.wordbook-badge { display: inline-block; font-size: .75rem; padding: 4px 7px; border-radius: 7px; background: #eaf0ec; color: #40594b; }
+.fully-unknown .wordbook-badge { background: #944c13; color: #fff; }
 @media (max-width: 560px) { .typed-answer-panel { padding: 18px; } .typed-input-footer { align-items: flex-start; } }

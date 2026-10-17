@@ -37,7 +37,7 @@
       this.querySelector('[data-unknown]').onclick = () => this.submit(true);
     }
     disconnectedCallback() { this.generation = null; }
-    draftKey() { return `typed-draft:${this.question.module}:${this.question.id}`; }
+    draftKey() { return `typed-draft:${this.question.module}:${this.question.id}${this.question.turnId ? ':' + this.question.turnId : ''}`; }
     error(message = '') {
       const element = this.querySelector('.submission-error'); element.textContent = message; element.classList.toggle('hidden', !message);
     }
@@ -76,13 +76,15 @@
       this.querySelector('.legacy-word-draft').classList.add('hidden');
       try {
         await this.savePromise.catch(() => {});
-        const [draft, legacy] = await Promise.all([notebook.get(this.draftKey()), notebook.get(`draft:${question.module}:${question.id}`)]);
+        let [draft, legacy] = await Promise.all([notebook.get(this.draftKey()), notebook.get(`draft:${question.module}:${question.id}`)]);
+        if (!draft && question.adoptLegacy) draft = await notebook.get(`typed-draft:${question.module}:${question.id}`);
         if (generation !== this.generation) return;
         this.input.value = draft?.answer || '';
         if (draft?.attemptId) {
           const attempt = await notebook.get(`attempt:${draft.attemptId}`);
           if (generation !== this.generation) return;
           if (attempt && !attempt.counted && !attempt.skipped && attempt.question.id === question.id && attempt.inputMode === 'typed') {
+            attempt.question = copy(question);
             this.attempt = attempt; this.renderResult();
             this.dispatchEvent(new CustomEvent('answer-graded', { bubbles: true, detail: { question, status: attempt.status } }));
           }
@@ -107,7 +109,7 @@
         if (generation !== this.generation) return;
         this.attempt = attempt; await this.queueDraft();
         if (generation !== this.generation) return;
-        this.renderResult(); this.renderHistory();
+        this.renderResult(); this.renderHistory(); this.input.blur();
         this.dispatchEvent(new CustomEvent('answer-graded', { bubbles: true, detail: { question, status: attempt.status } }));
       } catch { if (generation === this.generation) { this.attempt = null; this.error('核对结果未保存成功，输入仍在，请再次提交；本题尚未计分。'); } }
       finally { if (generation === this.generation) this.setBusy(false); }

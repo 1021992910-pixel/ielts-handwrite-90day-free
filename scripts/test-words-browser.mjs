@@ -21,11 +21,15 @@ const settled = () => page.waitForFunction(() => { const workspace = document.qu
 async function select(word, direction = 'en-zh') {
   await settled();
   await page.evaluate(({ word, selectedDirection }) => {
+    window.__wordFixtureSessions ||= {};
+    if (currentWord) window.__wordFixtureSessions[`${direction}:${currentWord[0]}`] = wordSession();
     direction = selectedDirection;
     // Deterministically choose an unfinished question for component assertions.
     // Real round ordering and repeat rules are tested separately.
-    state.wordRounds ||= {};
-    state.wordRounds[direction] = { number: 1, pending: [word, ...words().map(item => item[0].toLowerCase()).filter(item => item !== word)] };
+    wordSource = 'daily';
+    const pool = words().sort((a, b) => Number(b[0] === word) - Number(a[0] === word));
+    const previous = window.__wordFixtureSessions[`${direction}:${word}`];
+    state.wordSessions[sessionKey()] = WordPractice.current(previous)?.[0] === word ? previous : WordPractice.create(pool, { id: crypto.randomUUID(), day: todayKey(), direction, random: false });
     document.querySelectorAll('[data-direction]').forEach(button => button.classList.toggle('active', button.dataset.direction === direction));
     nextWord(word);
   }, { word, selectedDirection: direction });
@@ -39,7 +43,7 @@ async function submit(answer, status) {
 try {
   await page.goto(base); await settled();
   await page.evaluate(() => {
-    state.activeWord = 'different'; state.wordDirection = 'en-zh'; state.wordReviewed = 7;
+    state.activeWord = 'different'; state.wordDirection = 'en-zh'; state.wordReviewed = 7; state.wordSessions = {};
     state.wordStats.education = { rating: 3, next: '2099-01-01', reasons: ['旧错因'] };
     state.readingText = '原有阅读材料'; state.spellingReviewed = 11; saveState();
     return window.HandwritingNotebook.import([

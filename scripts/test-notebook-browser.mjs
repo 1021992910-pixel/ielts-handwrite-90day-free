@@ -53,7 +53,8 @@ async function ink() {
 try {
   await page.goto(url); await page.locator('[data-view=words]').click();
   assert.equal(await page.locator('#wordScribbleAnswer').count(), 0);
-  await page.evaluate(() => nextWord('different')); await settled();
+  await page.waitForFunction(() => window.WordPracticeReady);
+  await page.evaluate(() => { createWordSession('different'); nextWord(); }); await settled();
   await workspace().locator('[data-submit]').click();
   assert.match(await workspace().locator('.submission-error').innerText(), /先.*写/); assert.equal(calls, 0);
   await ink();
