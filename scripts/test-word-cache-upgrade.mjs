@@ -59,7 +59,7 @@ try {
   }
   oldVersion = false;
   // Old cache controls this navigation; versioned scripts must still load the new grader.
-  await page.goto(`${url}index.html?v=1017B`);
+  await page.goto(`${url}index.html?v=1017C`);
   await page.waitForFunction(() => document.querySelector('#wordWorkspace')?.input && !document.querySelector('#wordWorkspace').busy);
   await page.locator('[data-view=words]').click();
   assert.equal(await page.evaluate(() => state.wordReviewed), 17);
@@ -74,8 +74,8 @@ try {
     await page.locator('#wordWorkspace .grade-result.correct').waitFor();
   }
   await page.waitForFunction(async () => {
-    const cache = await caches.open('ielts-handwrite-words-v13');
-    return Boolean(await cache.match('./word-answers.js?v=1017B'));
+    const cache = await caches.open('ielts-handwrite-words-v14');
+    return Boolean(await cache.match('./word-answers.js?v=1017C'));
   });
   if (browserName === 'chromium') {
     await context.setOffline(true);

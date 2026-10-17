@@ -8,7 +8,7 @@
         <article class="panel typed-answer-panel"><label class="typed-label" for="typedWordAnswer">输入答案</label>
           <textarea id="typedWordAnswer" rows="3" maxlength="200" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="done"></textarea>
           <div class="typed-input-footer"><button class="text-button" data-clear type="button">清空</button></div>
-          <div class="submission-bar"><button class="primary" data-submit type="button">提交核对</button><button class="text-button" data-unknown type="button">完全不会</button></div>
+          <div class="submission-bar"><button class="primary" data-submit type="button">提交核对</button><button class="text-button" data-unknown type="button">暂时不会，查看答案并记录复习</button></div>
         </article>
         <p class="submission-error hidden" role="alert"></p>
         <section class="grade-result hidden" role="status" aria-live="polite"><strong class="grade-title"></strong>

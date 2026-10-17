@@ -58,6 +58,7 @@ try {
   assert.equal(await workspace().locator('canvas').count(), 0);
   assert.equal(await workspace().locator('textarea').getAttribute('autocorrect'), 'off');
   assert.equal(await workspace().locator('textarea').getAttribute('spellcheck'), 'false');
+  assert.equal(await workspace().locator('[data-unknown]').innerText(), '暂时不会，查看答案并记录复习', 'Keep the action distinct from the fully-unknown error reason');
   await workspace().locator('[data-submit]').click();
   assert.match(await workspace().locator('.submission-error').innerText(), /先输入/);
   assert.equal(await page.evaluate(() => state.wordReviewed), 7);
@@ -135,6 +136,8 @@ try {
   await select('improve', 'zh-en'); await workspace().locator('[data-unknown]').click();
   await workspace().locator('.grade-result.wrong').waitFor(); await settled();
   assert.equal(await workspace().getByLabel('完全不会', { exact: true }).isChecked(), true);
+  assert.equal(await page.evaluate(() => document.querySelector('#wordWorkspace').attempt.unknown), true);
+  assert.notEqual(await workspace().locator('[data-expected]').innerText(), '');
   await workspace().locator('[data-next]').click(); await page.waitForFunction(() => state.wordReviewed === 12); await settled();
   await select('different'); await workspace().locator('[data-clear]').click(); await submit('不一样', 'correct');
   await workspace().locator('.answer-history > summary').click();

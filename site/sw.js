@@ -1,5 +1,5 @@
-const CACHE = "ielts-handwrite-words-v13";
-const FILES = ["./", "./index.html", "./styles.css?v=1017B", "./spelling-data.js", "./local-grader.js?v=1017B", "./handwriting.js", "./word-rounds.js?v=1016B", "./word-practice.js?v=1017B", "./word-answers.js?v=1017B", "./free-grader.js", "./free-ocr-worker.js", "./free-ocr-assets.js", "./ocr-assets-manifest.js", "./app.js?v=1017B", "./manifest.webmanifest"];
+const CACHE = "ielts-handwrite-words-v14";
+const FILES = ["./", "./index.html", "./styles.css?v=1017B", "./spelling-data.js", "./local-grader.js?v=1017B", "./handwriting.js", "./word-rounds.js?v=1016B", "./word-practice.js?v=1017B", "./word-answers.js?v=1017C", "./free-grader.js", "./free-ocr-worker.js", "./free-ocr-assets.js", "./ocr-assets-manifest.js", "./app.js?v=1017B", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)));
